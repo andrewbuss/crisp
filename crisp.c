@@ -18,6 +18,10 @@
 #define LIST2(a, ...) cons((a), LIST1(__VA_ARGS__))
 #define LIST3(a, ...) cons((a), LIST2(__VA_ARGS__))
 
+#ifndef DEBUG
+#define DEBUG 0
+#endif
+
 #define DPRINTF(fmt, ...) \
             do { if (DEBUG) fprintf(stderr, fmt, __VA_ARGS__); } while (0)
 
@@ -320,7 +324,7 @@ cell evalmap(cell args, cell env) {
 cell eval(cell c, cell env) {
     switch (CELL_TYPE(c)) {
         case PAIR: {
-            DPRINTF("Evalling %s\n", leaky_print(c), leaky_print(env));
+            DPRINTF("Evalling %s\n", leaky_print(c));
             cell first = eval(car(c), env);
             if (!cdr(c)) return LIST1(first);
             if (CELL_TYPE(first) == LAMBDA || CELL_TYPE(first) == C_FUNCTION) {
