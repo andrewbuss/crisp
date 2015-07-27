@@ -11,4 +11,17 @@ like "and" and "not" are defined in the tests file.
 Source those and start the interpreter:
 
     cat tests - | ./crisp
-    
+
+The intent of the interpreter architecture is to first implement the simple
+cell data structure, then implement lisp primitives - cons, car, equal -
+using only these data structures, then to finally implement
+eval, apply, if, lambda, etc using these primitives. The result is that there
+is a single stack (shaped like a linked list) of symbol/value pairs. Each
+symbol lookup requires a full O(n) scan of this stack. A hash table would
+surely be faster but would require deviation from the pure list approach.
+
+The major limitation at present is the hilariously naive garbage collection.
+After evaluating each line, the interpreter recurses through the
+global environment and copies live cells over to a new arena. This places a
+hard cap on the number of cells which can be allocated while evaluating each
+logical line. 

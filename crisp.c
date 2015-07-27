@@ -22,6 +22,7 @@
 #define DEBUG 0
 #endif
 
+#define CELL_POOL_SIZE 10000000
 #define DPRINTF(fmt, ...) \
             do { if (DEBUG) fprintf(stderr, fmt, __VA_ARGS__); } while (0)
 
@@ -300,14 +301,8 @@ cell lambda(cell args) {
     DPRINTF("Making lambda %s = %s\n", leaky_print(vars), leaky_print(expr));
     return make_lambda(vars, expr);
 }
-cell quote(cell args) { return args; }
-cell map(cell args, cell env) {
-    DPRINTF("Mapping %s over %s\n", leaky_print(car(args)), leaky_print(cdar(args)));
-    cell f = car(args), l = cdar(args);
-    if (!l) return NIL;
-    return cons(apply(LIST2(f, car(l)), env), map(LIST2(f, cdr(l)), env));
-}
 
+cell quote(cell args) { return args; }
 
 cell if_fn(cell args, cell env) {
     cell predicate = eval(car(args), env);
@@ -357,7 +352,7 @@ cell def(cell args, cell env) {
 }
 
 int main() {
-    _cell* arena_base = (_cell*) malloc((sizeof(_cell)) * 1000000);
+    _cell* arena_base = (_cell*) malloc((sizeof(_cell)) * CELL_POOL_SIZE);
     arena = arena_base;
 
 
@@ -367,7 +362,6 @@ int main() {
     global_env = cons(cons(sym("quote"), make_c_function(quote, false, true)), global_env);
     global_env = cons(cons(sym("lambda"), make_c_function(lambda, false, true)), global_env);
     global_env = cons(cons(sym("apply"), make_c_function(apply, true, false)), global_env);
-    global_env = cons(cons(sym("map"), make_c_function(map, true, false)), global_env);
     global_env = cons(cons(sym("car"), make_c_function(car_fn, false, false)), global_env);
     global_env = cons(cons(sym("cdr"), make_c_function(cdr_fn, false, false)), global_env);
     global_env = cons(cons(sym("cons"), make_c_function(cons_fn, false, false)), global_env);
@@ -411,7 +405,7 @@ int main() {
         // Switch to a new arena, deep-copy the entire global environment, then free the old arena
         // This is totally a legitimate GC strategy.
         _cell* old_arena = arena_base;
-        arena = arena_base = (_cell*) malloc(sizeof(_cell) * 1000000);
+        arena = arena_base = (_cell*) malloc(sizeof(_cell) * CELL_POOL_SIZE);
         global_env = deep_copy(global_env);
         free(old_arena);
     }
