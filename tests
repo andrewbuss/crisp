@@ -1,0 +1,102 @@
+; These are the docs and also the test cases. Each logical line
+; in this script should evaluate to pass
+
+; Comments are prefixed by ; and continue to the end of the line
+; Whitespace and newlines are ignored
+; Undefined symbols evaluate to themselves
+
+pass
+
+; () is nil - the only false-y cell;
+; everything else is considered true
+
+; if evaluates and returns its second arg if the first is true
+; otherwise it evaluates and returns the third arg
+if 1 pass fail
+if () fail pass
+
+; Return pass if actual == expected, else fail
+def test lambda (actual expected) if (equal actual expected) pass fail
+
+; The built-in equal function returns nil if its arguments are nil
+; In a few lines we'll rewrite the test function to take this into account
+
+test 1 1
+
+; test that the test fails correctly!
+test (test 1 2) fail
+
+; the opposite of nil is true
+def not lambda a if a () true
+
+test (not ()) true
+test (not (not true)) true
+
+; if a and b are non-nil, return b
+def and lambda (a b) if a b ()
+test (and foo bar) bar
+test (not (and foo ())) true
+test (not (and () foo)) true
+test (not (and () ())) true
+
+; return a if either a or b are non-nil
+def or lambda (a b) if a a b
+def nor lambda (a b) not (or a b)
+
+; redefine our test to pass if actual == expected == nil
+def test lambda (actual expected) (
+    if (or (equal actual expected)
+           (nor actual expected))
+        pass
+        fail
+)
+
+test (or foo ()) foo
+test (or () foo) foo
+test (or foo foo) foo
+test (nor () ()) true
+
+
+; Parentheses are used here to include
+; the entire definition in the same logical line
+
+; Since the if statement comprises the entire lambda body,
+; the parentheses would not be necessary if we put the
+; definition all on one input line
+
+def reduce lambda (fn list init) (
+    if (not list)
+        init
+        (fn (car list) (reduce fn (cdr list) init)))
+
+; is the entire list non-nil?
+def all lambda l if (cdr l) (and (car l) (all (cdr l))) (car l)
+
+; asc: return the minimum arg if args are in strictly ascending order
+;      otherwise nil
+if (equal (asc 1 2 3) 1) pass fail
+if (asc 3 2 1) fail pass
+
+; sum: return the sum of its arguments
+if (equal (sum 1 2 3 4) 10) pass fail
+
+; product: return the product of its arguments
+if (equal (product 1 2 3 4) 24) pass fail
+
+; (apply f '(a b c)) is equivalent to (f a b c)
+if (equal (apply sum '(1 2 3 4)) 10) pass fail
+
+; boring recursive example
+def factorial lambda x (
+    if (asc x 1)
+        1
+        (product x (factorial (sum x -1))))
+
+test (factorial 19) 121645100408832000
+
+; some lambda regression tests
+
+test ((lambda x x) 1) 1
+test ((lambda (x) x) 1) 1
+test ((lambda (x) (x)) 1) 1
+test ((lambda x (x)) 1) 1

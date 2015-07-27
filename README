@@ -1,0 +1,14 @@
+crisp: a C lisp
+
+Build with:
+
+    CFLAGS="-Wall" make crisp
+
+Some syntax documentation and testing code is in the tests file.
+A minimal set of functions is implemented in C, but friendlier functions
+like "and" and "not" are defined in the tests file.
+
+Source those and start the interpreter:
+
+    cat tests - | ./crisp
+    
