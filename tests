@@ -23,6 +23,15 @@ def test lambda (actual expected) if (equal actual expected) pass fail
 
 test 1 1
 
+; The quote function returns its arguments (a list) unevaluated
+; 'cdr is syntactic sugar for (quote . cdr)
+
+test (car (quote cdr)) 'cdr
+
+; The eval function evaluates its argument
+test (eval sum 1 2) 3
+test (eval '(car (cons a b))) a
+
 ; test that the test fails correctly!
 test (test 1 2) fail
 
@@ -43,21 +52,60 @@ test (not (and () ())) true
 def or lambda (a b) if a a b
 def nor lambda (a b) not (or a b)
 
-; redefine our test to pass if actual == expected == nil
-def test lambda (actual expected) (
-    if (or (equal actual expected)
-           (nor actual expected))
-        pass
-        fail
+;test (not (ispair a)) true
+; test (cons (ispair (a b))) a
+
+; if more than three arguments are passed to the if function,
+; everything past the second is treated as the "else"
+; .. including another if!
+def list-equal lambda (a b) (
+    if (nor a b)
+        true
+    if (or  (equal (car a) (car b))
+            (nor (car a) (car b)))
+        (list-equal (cdr a) (cdr b))
+    ()
 )
 
-test (or foo ()) foo
-test (or () foo) foo
-test (or foo foo) foo
-test (nor () ()) true
+test (list-equal () ()) true
+test (list-equal (a b) (a b)) true
+test (list-equal (() b) (() b)) true
+test (not (list-equal (a ()) (a b))) true
+test (not (list-equal (a d f) (a f d))) true
+
+def loose-equal lambda (a b) (
+    if (list-equal a b) a
+    if (equal a b) a ; are the results non-nil and equal?
+    if (nor a b) true
+    ()
+)
+
+; we've tested quote and eval, and implemented nor
+; redefine our test to pass if actual == expected == nil
+; and tell us the details of the test which failed
+def test lambda (actual expected) (
+    if (loose-equal eval actual)
+        (pass: actual == expected)
+        (fail: actual != expected)
+)
 
 
-; Parentheses are used here to include
+
+; redefine our test function to
+def test lambda (actual expected) (
+    if (or (equal (eval actual) expected)  ; are the results non-nil and equal?
+           (nor   (eval actual) expected)) ; failing that, are they both nil?
+        (pass: actual == expected)
+        (fail: actual != expected)
+)
+
+
+test '(or foo ()) foo
+test '(or () foo) foo
+test '(or foo foo) foo
+test '(nor () ()) true
+
+; The outer parentheses are used here to include
 ; the entire definition in the same logical line
 
 ; Since the if statement comprises the entire lambda body,
@@ -68,49 +116,53 @@ test (nor () ()) true
 def reduce lambda (fn list init) (
     if (not list)
         init
-        (fn (car list) (reduce fn (cdr list) init)))
+        fn (car list) (reduce fn (cdr list) init))
 
 def map lambda (fn list) (
     if (not list)
         ()
-        (cons (fn (car list)) (map fn (cdr list))))
+        cons (fn (car list)) (map fn (cdr list)))
 
 ; is the entire list non-nil?
 def all lambda list reduce and list true
 
-test (all (1 2 foo bar)) true
-test (all (1 2 () bar)) ()
-test (all ()) true
+test '(all (1 2 foo bar)) true
+test '(all (1 2 () bar)) ()
+test '(all ()) true
 
 ; is at least one element non-nil?
 def any lambda list reduce or list ()
 
-test (any (1 2 foo bar)) 1
-test (any (1 2 () bar)) 1
-test (any (() () ())) ()
-test (any ()) ()
+test '(any (1 2 foo bar)) 1
+test '(any (1 2 () bar)) 1
+test '(any (() () ())) ()
+test '(any ()) ()
 
 ; are all elements nil?
-def none lambda list reduce nor list ()
+def none lambda list (
+    if (not list)
+        true ; all elements of an empty list are nil
+        reduce nor list ())
 
-test (none (1 2 foo bar)) ()
-test (none (1 2 () bar)) ()
-test (none (() () ())) true
-test (none ()) () true
+test '(none (1 2 foo bar)) ()
+test '(none (1 2 () bar)) ()
+test '(none (() () ())) true
+test '(none (())) true
+test '(none ()) true
 
 ; asc: return the minimum arg if args are in strictly ascending order
 ;      otherwise nil
-if (equal (asc 1 2 3) 1) pass fail
-if (asc 3 2 1) fail pass
+test '(asc 1 2 3) 1
+test '(asc 3 2 1) ()
 
 ; sum: return the sum of its arguments
-if (equal (sum 1 2 3 4) 10) pass fail
+test '(sum 1 2 3 4) 10
 
 ; product: return the product of its arguments
-if (equal (product 1 2 3 4) 24) pass fail
+test '(product 1 2 3 4) 24
 
 ; (apply f '(a b c)) is equivalent to (f a b c)
-if (equal (apply sum '(1 2 3 4)) 10) pass fail
+test '(apply sum '(1 2 3 4)) 10
 
 ; boring recursive example
 def factorial lambda x (
@@ -118,7 +170,7 @@ def factorial lambda x (
         1
         (product x (factorial (sum x -1))))
 
-test (factorial 19) 121645100408832000
+test '(factorial 19) 121645100408832000
 
 ; *exciting* and slow recursive example
 def fib lambda x (
@@ -126,14 +178,28 @@ def fib lambda x (
         x
         (sum (fib (sum x -1)) (fib (sum x -2))))
 
-; This is the highest we can evaluate without running out of memory. Awesome GC.
-test (fib 15) 610
+test '(fib 10) 55
+
+def fibpair lambda x (
+    if (asc x 2)
+        (1 1)
+        (apply  (lambda (a b) b (sum a b))
+                (fibpair (sum x -1))))
+
+; def fib x (car (fibpair x))
 
 ; some lambda regression tests
 
-test ((lambda x x) 1) 1
-test ((lambda (x) x) 1) 1
-test ((lambda (x) (x)) 1) 1
-test ((lambda x (x)) 1) 1
-test ((lambda (x y) x) 1 2) 1
-test ((lambda (x y) y) 1 2) 2
+test '((lambda x x) 1) 1
+test '((lambda (x) x) 1) 1
+test '((lambda (x) (x)) 1) 1
+test '((lambda x (x)) 1) 1
+
+test '((lambda (x y) x) 1 2) 1
+test '((lambda (x y) y) 1 2) 2
+
+test '((lambda (a b) (a b)) 1 2) (quote 1 2)
+test '(car (cdr ((lambda (a b) a b) 1 2))) 2
+test '(car (cdr ((lambda (a b) (a b)) 1 2))) 2
+test '(car (cdr ((lambda (a b) list a b) 1 2))) 2
+

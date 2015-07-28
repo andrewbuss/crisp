@@ -14,6 +14,7 @@
 #define cdar(c) car(cdr(c))
 #define cddr(c) cdr(cdr(c))
 #define cddar(c) car(cdr(cdr(c)))
+#define cdddr(c) cdr(cdr(cdr(c)))
 #define LIST1(a) cons((a), NIL)
 #define LIST2(a, ...) cons((a), LIST1(__VA_ARGS__))
 #define LIST3(a, ...) cons((a), LIST2(__VA_ARGS__))
@@ -118,9 +119,12 @@ cell deep_copy(cell c) {
 cell car_fn(cell args) { return caar(args); }
 cell cdr_fn(cell args) { return cadr(args); }
 cell cons_fn(cell args) { return cons(car(args), cdar(args)); }
+cell ispair(cell args) { return CELL_TYPE(cdar(args)) == PAIR ? cdar(args) : NIL; }
 cell same(cell args) {
-    if (!cdr(args)) return car(args);
-    return car(args) == same(cdr(args));
+    cell first = car(args);
+    cell rest = cdr(args);
+    if (!rest || first == same(rest)) return first;
+    return NIL;
 }
 
 char* leaky_print(cell c);
@@ -243,6 +247,7 @@ cell zip(cell args) {
     cell a = car(args), b = cdar(args);
     if (!a || !b) return NIL;
     DPRINTF("zipping %s %s\n", leaky_print(a), leaky_print(b));
+    if (!cdr(a) && cdr(b)) return cons(car(a), b);
     cell rv = cons(cons(car(a), car(b)), zip(LIST2(cdr(a), cdr(b))));
     return rv;
 }
@@ -279,7 +284,6 @@ cell apply(cell args, cell env) {
     DPRINTF("Applying %s to %s\n", leaky_print(fn), leaky_print(args));
     if (CELL_TYPE(fn) == LAMBDA) {
         cell result = eval(cdr(fn), concat(LIST2(zip(LIST2(car(fn), args)), env)));
-        if (CELL_TYPE(result) == PAIR && !cadr(result)) result = car(result);
         return result;
     }
     else if (CELL_TYPE(fn) == C_FUNCTION) {
@@ -307,7 +311,11 @@ cell if_fn(cell args, cell env) {
     cell predicate = eval(car(args), env);
     if (predicate)
         return eval(cdar(args), env);
-    return eval(cddar(args), env);
+    else if (cdddr(args))
+        // if a "fourth argument" is provided, eval it as part of the "else"
+        return eval(cddr(args), env);
+    else
+        return eval(cddar(args), env);
 }
 
 cell evalmap(cell args, cell env) {
@@ -322,15 +330,15 @@ cell eval(cell c, cell env) {
             // () -> ()
             if (!car(c)) return c;
             cell first = eval(car(c), env);
+            cell rest = cdr(c);
             // (f x) -> f x
             if (!cdr(c)) return first;
             if (CELL_TYPE(first) == LAMBDA || CELL_TYPE(first) == C_FUNCTION) {
-                cell args = cdr(c);
                 if (CELL_TYPE(first) == LAMBDA || !CELL_DEREFERENCE(first).hold_args)
-                    args = evalmap(args, env);
-                return apply(LIST2(first, args), env);
+                    rest = evalmap(rest, env);
+                return apply(LIST2(first, rest), env);
             }
-            return c;
+            return cons(first, evalmap(rest, env));
         }
         case SYMBOL: {
             cell resolved_symbol = assoc(LIST2(c, env));
@@ -372,6 +380,7 @@ int main() {
     global_env = cons(cons(sym("list"), make_c_function(quote, false, false)), global_env);
     global_env = cons(cons(sym("concat"), make_c_function(concat, false, false)), global_env);
     global_env = cons(cons(sym("equal"), make_c_function(equal, false, false)), global_env);
+    global_env = cons(cons(sym("ispair"), make_c_function(ispair, false, false)), global_env);
     global_env = cons(cons(sym("same"), make_c_function(same, false, false)), global_env);
     global_env = cons(cons(sym("def"), make_c_function(def, true, true)), global_env);
     global_env = cons(cons(sym("asc"), make_c_function(asc, false, false)), global_env);
@@ -407,7 +416,8 @@ int main() {
         *j = '\0';
         char* buf_ = buf;
         cell expr = parse(&buf_);
-        if(!expr) continue;
+        if (!expr) continue;
+        DPRINTF("Parsed %s\n", leaky_print(expr));
         cell evalled = eval(expr, global_env);
         if (evalled) {
             print(buf, evalled);
