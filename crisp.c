@@ -297,7 +297,6 @@ cell lambda(cell args) {
     cell vars = car(args);
     if (CELL_TYPE(vars) == SYMBOL) vars = LIST1(vars);
     cell expr = cdr(args);
-    while (CELL_TYPE(expr) == PAIR && !cdr(expr)) expr = car(expr);
     DPRINTF("Making lambda %s = %s\n", leaky_print(vars), leaky_print(expr));
     return make_lambda(vars, expr);
 }
@@ -320,8 +319,11 @@ cell eval(cell c, cell env) {
     switch (CELL_TYPE(c)) {
         case PAIR: {
             DPRINTF("Evalling %s\n", leaky_print(c));
+            // () -> ()
+            if (!car(c)) return c;
             cell first = eval(car(c), env);
-            if (!cdr(c)) return LIST1(first);
+            // (f x) -> f x
+            if (!cdr(c)) return first;
             if (CELL_TYPE(first) == LAMBDA || CELL_TYPE(first) == C_FUNCTION) {
                 cell args = cdr(c);
                 if (CELL_TYPE(first) == LAMBDA || !CELL_DEREFERENCE(first).hold_args)
@@ -346,8 +348,8 @@ cell eval(cell c, cell env) {
 
 cell def(cell args, cell env) {
     cell referent = eval(cdr(args), env);
-    cell new_pair = cons(car(args), referent);
-    cdr(global_env) = cons(new_pair, cdr(global_env));
+    cell var_name = car(args);
+    cdr(global_env) = cons(cons(var_name, referent), cdr(global_env));
     return NIL;
 }
 
@@ -375,6 +377,16 @@ int main() {
     global_env = cons(cons(sym("asc"), make_c_function(asc, false, false)), global_env);
     global_env = cons(cons(sym("LOCALS-OVERHEAD"), NIL), global_env);
 
+    // The global env looks like this:
+    //     (y . 5) (z . 5) .. (LOCALS-OVERHEAD) (identity . LAMBDA(x)<x>) .. (asc . C_FUNCTION<0x123>) (def . C_FUNCTION<0x456>) ...
+    // local variables-^       just a marker-^      global vars-^              builtins-^
+
+    // Lookups proceed left to right so local variables occlude global variables,
+    // global variables occlude builtins, and more recent global var definitions
+    // occlude older definitions
+
+    // global_env always points at the LOCALS-OVERHEAD marker
+
     char* line = NULL;
     size_t len = 0;
     while (1) {
@@ -395,7 +407,7 @@ int main() {
         *j = '\0';
         char* buf_ = buf;
         cell expr = parse(&buf_);
-
+        if(!expr) continue;
         cell evalled = eval(expr, global_env);
         if (evalled) {
             print(buf, evalled);

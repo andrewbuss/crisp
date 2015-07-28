@@ -135,3 +135,5 @@ test ((lambda x x) 1) 1
 test ((lambda (x) x) 1) 1
 test ((lambda (x) (x)) 1) 1
 test ((lambda x (x)) 1) 1
+test ((lambda (x y) x) 1 2) 1
+test ((lambda (x y) y) 1 2) 2

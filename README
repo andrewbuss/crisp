@@ -24,4 +24,4 @@ The major limitation at present is the hilariously naive garbage collection.
 After evaluating each line, the interpreter recurses through the
 global environment and copies live cells over to a new arena. This places a
 hard cap on the number of cells which can be allocated while evaluating each
-logical line. 
+logical line.
