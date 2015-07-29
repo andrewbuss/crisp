@@ -119,7 +119,7 @@ cell deep_copy(cell c) {
 cell car_fn(cell args) { return caar(args); }
 cell cdr_fn(cell args) { return cadr(args); }
 cell cons_fn(cell args) { return cons(car(args), cdar(args)); }
-cell ispair(cell args) { return CELL_TYPE(cdar(args)) == PAIR ? cdar(args) : NIL; }
+cell ispair(cell args) { return CELL_TYPE(car(args)) == PAIR ? car(args) : NIL; }
 cell same(cell args) {
     cell first = car(args);
     cell rest = cdr(args);
