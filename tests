@@ -218,3 +218,21 @@ test '(car (cdr ((lambda (a b) a b) 1 2))) 2
 test '(car (cdr ((lambda (a b) (a b)) 1 2))) 2
 test '(car (cdr ((lambda (a b) list a b) 1 2))) 2
 
+; yield a list containing each element i of l
+; such that (f i) is non-nil
+def filter lambda (f l) (
+    if (not l)
+        ()
+    if (f (car l))
+        (cons (car l) (filter f (cdr l)))
+        (filter f (cdr l))
+)
+
+; filter out numbers less than 1
+test '(filter (lambda x (asc 0 x)) (4 -5 2 -67 0)) (4 2)
+
+; filtering an empty list yields an empty list
+test '(filter sum ()) ()
+
+; filtering with the identity function does not affect the list
+test '(filter (lambda x x) (a b c)) (a b c)
