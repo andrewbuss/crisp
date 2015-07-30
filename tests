@@ -236,3 +236,15 @@ test '(filter sum ()) ()
 
 ; filtering with the identity function does not affect the list
 test '(filter (lambda x x) (a b c)) (a b c)
+
+def reverse-copy lambda (l r)(       ; build r backward as we recurse forwards through l
+    if l
+        (reverse-copy (cdr l) (cons (car l) r))
+        r
+)
+
+def reverse lambda l reverse-copy l () ; wrapper
+
+test '(reverse ()) ()
+test '(reverse (a b c)) (c b a)
+
