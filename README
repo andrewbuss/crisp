@@ -6,11 +6,11 @@ Build with:
 
 Some syntax documentation and testing code is in the tests file.
 A minimal set of functions is implemented in C, but friendlier functions
-like "and" and "not" are defined in the tests file.
+like "and" and "not" are defined in the stdlib.crisp file.
 
 Source those and start the interpreter:
 
-    cat tests - | ./crisp
+    cat stdlib.crisp - | ./crisp
 
 The intent of the interpreter architecture is to first implement the simple
 cell data structure, then implement lisp primitives - cons, car, equal -

@@ -154,3 +154,7 @@ test '(range 4) (0 1 2 3)
 test '(range -1) ()
 
 test '(void (sum 1 2 3)) ()
+
+void (libc.puts
+        (glib.g_base64_decode SWYgeW91J3JlIHJlYWRpbmcgdGhpcywgYmFzZTY0IHdpdGggZ2xpYiB3b3JrcwA=
+        (libc.malloc 4)))

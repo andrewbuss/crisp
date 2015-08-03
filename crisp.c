@@ -1,3 +1,4 @@
+#include <dlfcn.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -28,7 +29,7 @@
             do { if (DEBUG) fprintf(stderr, fmt, __VA_ARGS__); } while (0)
 
 enum celltype {
-    NIL, PAIR, SYMBOL, S64, LAMBDA, C_FUNCTION, STRING
+    NIL, PAIR, SYMBOL, S64, LAMBDA, BUILTIN_FUNCTION, FFI_FUNCTION, FFI_LIBRARY
 };
 
 typedef uintptr_t cell;
@@ -50,12 +51,14 @@ typedef union _cell {
 
     struct {
         union {
-            cell(* fn)(cell);
-            cell(* fn_env)(cell, cell);
+            cell(* fn)();
         };
 
         unsigned int with_env:1;
         unsigned int hold_args:1;
+    };
+    struct {
+        void* handle;
     };
 } _cell;
 
@@ -63,6 +66,7 @@ _cell* arena;
 cell env_base = NIL;
 cell global_env = NIL;
 cell symbols = NIL;
+void* libhandles = NIL;
 
 /* Cell manipulation functions ---------------- */
 
@@ -83,13 +87,14 @@ cell make_lambda(cell params, cell expr) {
     return c | LAMBDA;
 }
 
-cell make_c_function(void* fn, int with_env, int hold_args) {
+cell make_builtin_function(void* fn, int with_env, int hold_args) {
     cell c = allocate_cell();
     CELL_DEREFERENCE(c).fn = fn;
     CELL_DEREFERENCE(c).with_env = with_env;
     CELL_DEREFERENCE(c).hold_args = hold_args;
-    return c | C_FUNCTION;
+    return c | BUILTIN_FUNCTION;
 }
+
 
 cell cons(cell car, cell cdr) {
     cell c = allocate_cell();
@@ -150,6 +155,40 @@ cell asc(cell args) {
     cell next = asc(cdr(args));
     if (!next) return next;
     if (CELL_DEREFERENCE(car(args)).s64 < CELL_DEREFERENCE(next).s64) return car(args);
+    return NIL;
+}
+
+cell assoc(cell);
+
+cell find_ffi_function(char* sym_name, cell env) {
+    char* dot = sym_name;
+    char* cur = sym_name;
+    do {
+        dot = cur + 1;
+        cur = strstr(dot, ".");
+    } while (cur);
+    if (!dot) return NIL;
+    size_t libname_len = dot - sym_name - 1;
+    char* libname = strncpy(malloc(libname_len + 1), sym_name, libname_len);
+    libname[libname_len] = 0;
+    cell lib = assoc(LIST2(sym(libname), env));
+    if (!lib) return NIL;
+    lib = cdr(lib);
+    if (CELL_TYPE(lib) != FFI_LIBRARY) return NIL;
+    void* sym = dlsym(CELL_DEREFERENCE(lib).handle, dot);
+    if (!sym) return NIL;
+    cell c = allocate_cell();
+    CELL_DEREFERENCE(c).fn = sym;
+    return c | FFI_FUNCTION;
+}
+
+cell dlopen_fn(cell args) {
+    void* handle = dlopen(CELL_DEREFERENCE(car(args)).symbol, RTLD_LAZY);
+    if (handle) {
+        cell c = allocate_cell();
+        CELL_DEREFERENCE(c).handle = handle;
+        return c | FFI_LIBRARY;
+    }
     return NIL;
 }
 
@@ -215,8 +254,12 @@ int print(char* buf, cell c) {
             return sprintf(buf, "%ld", CELL_DEREFERENCE(c).s64);
         case SYMBOL:
             return sprintf(buf, "%s", CELL_DEREFERENCE(c).symbol);
-        case C_FUNCTION:
-            return sprintf(buf, "C_FUNCTION<%p>", CELL_DEREFERENCE(c).fn);
+        case BUILTIN_FUNCTION:
+            return sprintf(buf, "BUILTIN_FUNCTION<%p>", CELL_DEREFERENCE(c).fn);
+        case FFI_FUNCTION:
+            return sprintf(buf, "FFI_FUNCTION<%p>", CELL_DEREFERENCE(c).fn);
+        case FFI_LIBRARY:
+            return sprintf(buf, "FFI_LIBRARY<%p>", CELL_DEREFERENCE(c).handle);
         case LAMBDA:
             i += sprintf(i, "LAMBDA(");
             i += print(i, car(c));
@@ -286,11 +329,35 @@ cell apply(cell args, cell env) {
         cell result = eval(cdr(fn), concat(LIST2(zip(LIST2(car(fn), args)), env)));
         return result;
     }
-    else if (CELL_TYPE(fn) == C_FUNCTION) {
+    else if (CELL_TYPE(fn) == BUILTIN_FUNCTION) {
         if (CELL_DEREFERENCE(fn).with_env)
-            return CELL_DEREFERENCE(fn).fn_env(args, env);
+            return CELL_DEREFERENCE(fn).fn(args, env);
         else
             return CELL_DEREFERENCE(fn).fn(args);
+    }
+    else if (CELL_TYPE(fn) == FFI_FUNCTION) {
+        // Hardcode cases for up to 4 args
+        void* ffi_args[4];
+        int i = 0;
+        for (; args && i < 4; args = cdr(args), i++) {
+            cell arg = car(args);
+            if (CELL_TYPE(arg) == SYMBOL) ffi_args[i] = CELL_DEREFERENCE(arg).symbol;
+            else if (CELL_TYPE(arg) == S64) ffi_args[i] = (void*) CELL_DEREFERENCE(arg).s64;
+            else if (CELL_TYPE(arg) == FFI_FUNCTION) ffi_args[i] = (void*) CELL_DEREFERENCE(arg).fn;
+            else if (CELL_TYPE(arg) == PAIR) ffi_args[i] = NIL;
+        }
+        switch (i) {
+            case 0:
+                return make_s64(CELL_DEREFERENCE(fn).fn());
+            case 1:
+                return make_s64(CELL_DEREFERENCE(fn).fn(ffi_args[0]));
+            case 2:
+                return make_s64(CELL_DEREFERENCE(fn).fn(ffi_args[0], ffi_args[1]));
+            case 3:
+                return make_s64(CELL_DEREFERENCE(fn).fn(ffi_args[0], ffi_args[1], ffi_args[2]));
+            case 4:
+                return make_s64(CELL_DEREFERENCE(fn).fn(ffi_args[0], ffi_args[1], ffi_args[2], ffi_args[3]));
+        }
     }
     printf("Can't apply %s\n", leaky_print(fn));
     return NIL;
@@ -320,8 +387,11 @@ cell if_fn(cell args, cell env) {
 
 cell evalmap(cell args, cell env) {
     if (!args) return NIL;
-    return cons(eval(car(args), env), evalmap(cdr(args), env));
+    cell first = eval(car(args), env);
+    cell rest = evalmap(cdr(args), env);
+    return cons(first, rest);
 }
+
 
 cell eval(cell c, cell env) {
     switch (CELL_TYPE(c)) {
@@ -333,8 +403,9 @@ cell eval(cell c, cell env) {
             cell rest = cdr(c);
             // (f x) -> f x
             if (!cdr(c)) return first;
-            if (CELL_TYPE(first) == LAMBDA || CELL_TYPE(first) == C_FUNCTION) {
-                if (CELL_TYPE(first) == LAMBDA || !CELL_DEREFERENCE(first).hold_args)
+            if (CELL_TYPE(first) == LAMBDA || CELL_TYPE(first) == BUILTIN_FUNCTION ||
+                CELL_TYPE(first) == FFI_FUNCTION) {
+                if (CELL_TYPE(first) != BUILTIN_FUNCTION || !CELL_DEREFERENCE(first).hold_args)
                     rest = evalmap(rest, env);
                 return apply(LIST2(first, rest), env);
             }
@@ -343,8 +414,11 @@ cell eval(cell c, cell env) {
         case SYMBOL: {
             cell resolved_symbol = assoc(LIST2(c, env));
             if (resolved_symbol) return cdr(resolved_symbol);
+            char* sym_name = CELL_DEREFERENCE(c).symbol;
+            cell ffi_fn = find_ffi_function(sym_name, env);
+            if (ffi_fn) return ffi_fn;
         }
-        case C_FUNCTION:
+        case BUILTIN_FUNCTION:
         case NIL:
         case LAMBDA:
         case S64:
@@ -366,28 +440,29 @@ int main() {
     arena = arena_base;
 
 
-    //                                                   with_env, hold_args
-    global_env = cons(cons(sym("if"), make_c_function(if_fn, true, true)), env_base);
-    global_env = cons(cons(sym("eval"), make_c_function(eval, true, false)), global_env);
-    global_env = cons(cons(sym("quote"), make_c_function(quote, false, true)), global_env);
-    global_env = cons(cons(sym("lambda"), make_c_function(lambda, false, true)), global_env);
-    global_env = cons(cons(sym("apply"), make_c_function(apply, true, false)), global_env);
-    global_env = cons(cons(sym("car"), make_c_function(car_fn, false, false)), global_env);
-    global_env = cons(cons(sym("cdr"), make_c_function(cdr_fn, false, false)), global_env);
-    global_env = cons(cons(sym("cons"), make_c_function(cons_fn, false, false)), global_env);
-    global_env = cons(cons(sym("sum"), make_c_function(sum, false, false)), global_env);
-    global_env = cons(cons(sym("product"), make_c_function(product, false, false)), global_env);
-    global_env = cons(cons(sym("list"), make_c_function(quote, false, false)), global_env);
-    global_env = cons(cons(sym("concat"), make_c_function(concat, false, false)), global_env);
-    global_env = cons(cons(sym("equal"), make_c_function(equal, false, false)), global_env);
-    global_env = cons(cons(sym("ispair"), make_c_function(ispair, false, false)), global_env);
-    global_env = cons(cons(sym("same"), make_c_function(same, false, false)), global_env);
-    global_env = cons(cons(sym("def"), make_c_function(def, true, true)), global_env);
-    global_env = cons(cons(sym("asc"), make_c_function(asc, false, false)), global_env);
+    //                                                         with_env, hold_args
+    global_env = cons(cons(sym("if"), make_builtin_function(if_fn, true, true)), env_base);
+    global_env = cons(cons(sym("eval"), make_builtin_function(eval, true, false)), global_env);
+    global_env = cons(cons(sym("quote"), make_builtin_function(quote, false, true)), global_env);
+    global_env = cons(cons(sym("lambda"), make_builtin_function(lambda, false, true)), global_env);
+    global_env = cons(cons(sym("apply"), make_builtin_function(apply, true, false)), global_env);
+    global_env = cons(cons(sym("car"), make_builtin_function(car_fn, false, false)), global_env);
+    global_env = cons(cons(sym("cdr"), make_builtin_function(cdr_fn, false, false)), global_env);
+    global_env = cons(cons(sym("cons"), make_builtin_function(cons_fn, false, false)), global_env);
+    global_env = cons(cons(sym("sum"), make_builtin_function(sum, false, false)), global_env);
+    global_env = cons(cons(sym("product"), make_builtin_function(product, false, false)), global_env);
+    global_env = cons(cons(sym("list"), make_builtin_function(quote, false, false)), global_env);
+    global_env = cons(cons(sym("concat"), make_builtin_function(concat, false, false)), global_env);
+    global_env = cons(cons(sym("equal"), make_builtin_function(equal, false, false)), global_env);
+    global_env = cons(cons(sym("ispair"), make_builtin_function(ispair, false, false)), global_env);
+    global_env = cons(cons(sym("same"), make_builtin_function(same, false, false)), global_env);
+    global_env = cons(cons(sym("def"), make_builtin_function(def, true, true)), global_env);
+    global_env = cons(cons(sym("asc"), make_builtin_function(asc, false, false)), global_env);
+    global_env = cons(cons(sym("dlopen"), make_builtin_function(dlopen_fn, false, false)), global_env);
     global_env = cons(cons(sym("LOCALS-OVERHEAD"), NIL), global_env);
 
     // The global env looks like this:
-    //     (y . 5) (z . 5) .. (LOCALS-OVERHEAD) (identity . LAMBDA(x)<x>) .. (asc . C_FUNCTION<0x123>) (def . C_FUNCTION<0x456>) ...
+    //     (y . 5) (z . 5) .. (LOCALS-OVERHEAD) (identity . LAMBDA(x)<x>) .. (asc . BUILTIN_FUNCTION<0x123>) (def . BUILTIN_FUNCTION<0x456>) ...
     // local variables-^       just a marker-^      global vars-^              builtins-^
 
     // Lookups proceed left to right so local variables occlude global variables,
