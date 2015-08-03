@@ -2,9 +2,13 @@ crisp: a C lisp
 
 Build with:
 
-    CFLAGS="-Wall" make crisp
+    CFLAGS="-lgc -ldl -Wall" make crisp
 
 Some syntax documentation and testing code is in the tests file.
+Run tests:
+
+    cat stdlib.crisp tests.crisp | ./crisp
+
 A minimal set of functions is implemented in C, but friendlier functions
 like "and" and "not" are defined in the stdlib.crisp file.
 

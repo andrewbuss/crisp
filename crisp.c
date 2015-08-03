@@ -1,3 +1,4 @@
+#include <gc.h>
 #include <dlfcn.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -62,7 +63,6 @@ typedef union _cell {
     };
 } _cell;
 
-_cell* arena;
 cell env_base = NIL;
 cell global_env = NIL;
 cell symbols = NIL;
@@ -71,7 +71,7 @@ void* libhandles = NIL;
 /* Cell manipulation functions ---------------- */
 
 cell allocate_cell() {
-    return (cell) (arena += sizeof(cell));
+    return GC_MALLOC(sizeof(_cell));
 }
 
 cell make_s64(uint64_t x) {
@@ -105,7 +105,7 @@ cell cons(cell car, cell cdr) {
 
 cell sym(char* symbol) {
     cell c = allocate_cell();
-    cell sym_cell = (cell) malloc(sizeof(_cell));
+    cell sym_cell = (cell) GC_MALLOC(sizeof(_cell));
     CELL_DEREFERENCE(sym_cell).symbol = CELL_DEREFERENCE(c).symbol = strdup(symbol);
     cdr(sym_cell) = symbols;
     symbols = sym_cell;
@@ -169,7 +169,7 @@ cell find_ffi_function(char* sym_name, cell env) {
     } while (cur);
     if (!dot) return NIL;
     size_t libname_len = dot - sym_name - 1;
-    char* libname = strncpy(malloc(libname_len + 1), sym_name, libname_len);
+    char* libname = strncpy(GC_MALLOC(libname_len + 1), sym_name, libname_len);
     libname[libname_len] = 0;
     cell lib = assoc(LIST2(sym(libname), env));
     if (!lib) return NIL;
@@ -216,7 +216,7 @@ cell parse(char** s) {
             char* i = *s;
             while (*i && !isspace(*i) && *i != '(' && *i != ')') i++;
             int token_len = i - *s;
-            char* token = strncpy(malloc(token_len + 1), *s, token_len);
+            char* token = strncpy(GC_MALLOC(token_len + 1), *s, token_len);
             token[token_len] = '\0';
             *s = i;
             cell c;
@@ -227,7 +227,6 @@ cell parse(char** s) {
             if (endptr != token) c = make_s64(val);
             else c = sym(token);
 
-            free(token);
             return cons(c, parse(s));
         }
     }
@@ -271,7 +270,7 @@ int print(char* buf, cell c) {
 }
 
 char* leaky_print(cell c) {
-    char* buf = malloc(4096);
+    char* buf = GC_MALLOC(4096);
     print(buf, c);
     return buf;
 }
@@ -436,10 +435,6 @@ cell def(cell args, cell env) {
 }
 
 int main() {
-    _cell* arena_base = (_cell*) malloc((sizeof(_cell)) * CELL_POOL_SIZE);
-    arena = arena_base;
-
-
     //                                                         with_env, hold_args
     global_env = cons(cons(sym("if"), make_builtin_function(if_fn, true, true)), env_base);
     global_env = cons(cons(sym("eval"), make_builtin_function(eval, true, false)), global_env);
@@ -479,7 +474,7 @@ int main() {
         int parens = 0;
         do {
             if (-1 == getline(&line, &len, stdin))
-                goto cleanup;
+                return 0;
             char* i = line;
             while (*i) {
                 if (*i == ';') break;
@@ -498,23 +493,5 @@ int main() {
             print(buf, evalled);
             puts(buf);
         }
-
-        // Switch to a new arena, deep-copy the entire global environment, then free the old arena
-        // This is totally a legitimate GC strategy.
-        _cell* old_arena = arena_base;
-        arena = arena_base = (_cell*) malloc(sizeof(_cell) * CELL_POOL_SIZE);
-        global_env = deep_copy(global_env);
-        free(old_arena);
     }
-    cleanup:
-    free(line);
-    // Free all the symbol strings
-    for (cell cur = symbols; cur;) {
-        free((char*) car(cur));
-        cell old = cur;
-        cur = cdr(cur);
-        free((_cell*) old);
-    }
-    free(arena_base);
-    return 0;
 }
