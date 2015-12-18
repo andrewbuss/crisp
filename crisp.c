@@ -7,8 +7,11 @@
 #include <string.h>
 #include <ctype.h>
 
-#define CELL_TYPE(x) ((unsigned char)(((cell)x)&0xf))
-#define CELL_DEREFERENCE(x) (*(_cell*)((x)&0xfffffffffffffff0))
+#define CELL_TYPE(x) ((uint64_t)(((cell)x)&0xffff000000000000))
+#define CELL_PTR(x) ((_cell*)((x)&0xffffffffffff))
+//#define CELL_TYPE(x) ((uint64_t)(((cell)x)&0xf))
+//#define CELL_PTR(x) ((_cell*)((x)&0xfffffffffff0))
+#define CELL_DEREFERENCE(x) (*CELL_PTR(x))
 #define car(c) CELL_DEREFERENCE(c).car
 #define cdr(c) CELL_DEREFERENCE(c).cdr
 #define caar(c) car(car(c))
@@ -21,16 +24,23 @@
 #define LIST2(a, ...) cons((a), LIST1(__VA_ARGS__))
 #define LIST3(a, ...) cons((a), LIST2(__VA_ARGS__))
 
-#ifndef DEBUG
-#define DEBUG 0
-#endif
+bool debug = false;
 
-#define CELL_POOL_SIZE 10000000
-#define DPRINTF(fmt, ...) \
-            do { if (DEBUG) fprintf(stderr, fmt, __VA_ARGS__); } while (0)
+#define DPRINTF(fmt, ...) do { if (debug) fprintf(stderr, fmt, __VA_ARGS__); } while (0)
+
+//enum celltype {
+//    NIL, PAIR, SYMBOL, S64, LAMBDA, BUILTIN_FUNCTION, FFI_FUNCTION, FFI_LIBRARY
+//};
 
 enum celltype {
-    NIL, PAIR, SYMBOL, S64, LAMBDA, BUILTIN_FUNCTION, FFI_FUNCTION, FFI_LIBRARY
+    NIL = 0x0000000000000,
+    PAIR = 0x1000000000000,
+    SYMBOL = 0x2000000000000,
+    S64 = 0x3000000000000,
+    LAMBDA = 0x4000000000000,
+    BUILTIN_FUNCTION = 0x5000000000000,
+    FFI_FUNCTION = 0x6000000000000,
+    FFI_LIBRARY = 0x7000000000000
 };
 
 typedef uintptr_t cell;
@@ -65,13 +75,12 @@ typedef union _cell {
 
 cell env_base = NIL;
 cell global_env = NIL;
-cell symbols = NIL;
-void* libhandles = NIL;
 
 /* Cell manipulation functions ---------------- */
 
 cell allocate_cell() {
-    return GC_MALLOC(sizeof(_cell));
+    cell rv = (cell) GC_MALLOC(sizeof(_cell));
+    return rv;
 }
 
 cell make_s64(uint64_t x) {
@@ -105,20 +114,19 @@ cell cons(cell car, cell cdr) {
 
 cell sym(char* symbol) {
     cell c = allocate_cell();
-    cell sym_cell = (cell) GC_MALLOC(sizeof(_cell));
-    CELL_DEREFERENCE(sym_cell).symbol = CELL_DEREFERENCE(c).symbol = strdup(symbol);
-    cdr(sym_cell) = symbols;
-    symbols = sym_cell;
+    CELL_DEREFERENCE(c).symbol = GC_MALLOC_ATOMIC(strlen(symbol) + 1);
+    strcpy(CELL_DEREFERENCE(c).symbol, symbol);
     return c | SYMBOL;
 }
 
 cell deep_copy(cell c) {
     if (!c) return NIL;
-    if (CELL_TYPE(c) == PAIR)
+    if (CELL_TYPE(c) == PAIR) {
         return cons(deep_copy(car(c)), deep_copy(cdr(c)));
+    }
     else if (CELL_TYPE(c) == LAMBDA)
         return make_lambda(deep_copy(car(c)), deep_copy(cdr(c)));
-    return CELL_TYPE(c) | (cell) memcpy((_cell*) allocate_cell(), (_cell*) (c & (~0xF)), sizeof(_cell));
+    return CELL_TYPE(c) | (cell) memcpy((_cell*) allocate_cell(), CELL_PTR(c), sizeof(_cell));
 }
 
 cell car_fn(cell args) { return caar(args); }
@@ -133,6 +141,16 @@ cell same(cell args) {
 }
 
 char* leaky_print(cell c);
+
+cell sum(cell args) {
+    if (!args) return make_s64(0);
+    return make_s64(CELL_DEREFERENCE(car(args)).s64 + CELL_DEREFERENCE(sum(cdr(args))).s64);
+}
+
+cell product(cell args) {
+    if (!args) return make_s64(1);
+    return make_s64(CELL_DEREFERENCE(car(args)).s64 * CELL_DEREFERENCE(product(cdr(args))).s64);
+}
 
 cell equal(cell args) {
     cell left = car(args);
@@ -168,15 +186,20 @@ cell find_ffi_function(char* sym_name, cell env) {
         cur = strstr(dot, ".");
     } while (cur);
     if (!dot) return NIL;
+
     size_t libname_len = dot - sym_name - 1;
     char* libname = strncpy(GC_MALLOC(libname_len + 1), sym_name, libname_len);
     libname[libname_len] = 0;
     cell lib = assoc(LIST2(sym(libname), env));
     if (!lib) return NIL;
+
     lib = cdr(lib);
-    if (CELL_TYPE(lib) != FFI_LIBRARY) return NIL;
+    if (CELL_TYPE(lib) != FFI_LIBRARY)
+        return NIL;
+
     void* sym = dlsym(CELL_DEREFERENCE(lib).handle, dot);
     if (!sym) return NIL;
+
     cell c = allocate_cell();
     CELL_DEREFERENCE(c).fn = sym;
     return c | FFI_FUNCTION;
@@ -235,8 +258,6 @@ cell parse(char** s) {
 int print(char* buf, cell c) {
     char* i = buf;
     switch (CELL_TYPE(c)) {
-        case NIL:
-            return sprintf(buf, "()");
         case PAIR: {
             if (CELL_TYPE(car(c)) == PAIR) {
                 i += sprintf(i, "(");
@@ -246,7 +267,8 @@ int print(char* buf, cell c) {
             else i += print(i, car(c));
             if (!cdr(c)) return i - buf;
             i += sprintf(i, " ");
-            if (CELL_TYPE(cdr(c)) != PAIR) i += sprintf(i, ". ");
+            if (CELL_TYPE(cdr(c)) != PAIR)
+                i += sprintf(i, ". ");
             return i - buf + print(i, cdr(c));
         }
         case S64:
@@ -265,8 +287,11 @@ int print(char* buf, cell c) {
             i += sprintf(i, ")<");
             i += print(i, cdr(c));
             return i - buf + sprintf(i, ">");
+        case NIL:
+            return sprintf(buf, "()");
+        default:
+            return sprintf(buf, "UNKNOWN");
     }
-    return 0;
 }
 
 char* leaky_print(cell c) {
@@ -285,20 +310,35 @@ cell concat(cell args) {
     return cons(car(first), concat(cons(cdr(first), rest)));
 }
 
+/*
+ * def zip (a b) (
+ *     if (or (not a) (not b))
+ *         ()
+ *     cons (cons (car a) (car b))
+ *          (zip (cdr a) (cdr b))
+ * )
+ */
 cell zip(cell args) {
     cell a = car(args), b = cdar(args);
     if (!a || !b) return NIL;
     DPRINTF("zipping %s %s\n", leaky_print(a), leaky_print(b));
-    if (!cdr(a) && cdr(b)) return cons(car(a), b);
+    //if (!cdr(a) && cdr(b)) return cons(car(a), b);
     cell rv = cons(cons(car(a), car(b)), zip(LIST2(cdr(a), cdr(b))));
     return rv;
 }
 
+// def keys lambda pairs cons (caar pairs) (keys (cdr pairs))
 cell keys(cell args) {
     if (!args) return NIL;
     return cons(caar(args), keys(cdr(args)));
 }
 
+/* def assoc lambda (key pairs) (
+ *     if (not pairs) ()
+ *     if (equal key (caar pairs))
+ *        (car pairs)
+ *        (assoc key (cdr pairs)))
+ */
 cell assoc(cell args) {
     cell key = car(args), dict = cdar(args);
     if (!dict) return NIL;
@@ -306,15 +346,6 @@ cell assoc(cell args) {
     return assoc(LIST2(key, cdr(dict)));
 }
 
-cell sum(cell args) {
-    if (!args) return make_s64(0);
-    return make_s64(CELL_DEREFERENCE(car(args)).s64 + CELL_DEREFERENCE(sum(cdr(args))).s64);
-}
-
-cell product(cell args) {
-    if (!args) return make_s64(1);
-    return make_s64(CELL_DEREFERENCE(car(args)).s64 * CELL_DEREFERENCE(product(cdr(args))).s64);
-}
 
 /* Special functions which require held variables or env access ------- */
 
@@ -325,6 +356,7 @@ cell apply(cell args, cell env) {
     args = cdar(args);
     DPRINTF("Applying %s to %s\n", leaky_print(fn), leaky_print(args));
     if (CELL_TYPE(fn) == LAMBDA) {
+        // eval (cdr fn) (concat (zip (car fn) args) env)
         cell result = eval(cdr(fn), concat(LIST2(zip(LIST2(car(fn), args)), env)));
         return result;
     }
@@ -340,10 +372,14 @@ cell apply(cell args, cell env) {
         int i = 0;
         for (; args && i < 4; args = cdr(args), i++) {
             cell arg = car(args);
-            if (CELL_TYPE(arg) == SYMBOL) ffi_args[i] = CELL_DEREFERENCE(arg).symbol;
-            else if (CELL_TYPE(arg) == S64) ffi_args[i] = (void*) CELL_DEREFERENCE(arg).s64;
-            else if (CELL_TYPE(arg) == FFI_FUNCTION) ffi_args[i] = (void*) CELL_DEREFERENCE(arg).fn;
-            else if (CELL_TYPE(arg) == PAIR) ffi_args[i] = NIL;
+            if (CELL_TYPE(arg) == SYMBOL)
+                ffi_args[i] = CELL_DEREFERENCE(arg).symbol;
+            else if (CELL_TYPE(arg) == S64)
+                ffi_args[i] = (void*) CELL_DEREFERENCE(arg).s64;
+            else if (CELL_TYPE(arg) == FFI_FUNCTION)
+                ffi_args[i] = (void*) CELL_DEREFERENCE(arg).fn;
+            else if (CELL_TYPE(arg) == PAIR)
+                ffi_args[i] = NIL;
         }
         switch (i) {
             case 0:
@@ -365,7 +401,8 @@ cell apply(cell args, cell env) {
 
 cell lambda(cell args) {
     cell vars = car(args);
-    if (CELL_TYPE(vars) == SYMBOL) vars = LIST1(vars);
+    if (CELL_TYPE(vars) == SYMBOL)
+        vars = LIST1(vars);
     cell expr = cdr(args);
     DPRINTF("Making lambda %s = %s\n", leaky_print(vars), leaky_print(expr));
     return make_lambda(vars, expr);
@@ -376,7 +413,11 @@ cell quote(cell args) { return args; }
 cell if_fn(cell args, cell env) {
     cell predicate = eval(car(args), env);
     if (predicate)
+        // evaluate the second argument
         return eval(cdar(args), env);
+    else if (!cddr(args))
+        // if no third argument is provided, nil
+        return NIL;
     else if (cdddr(args))
         // if a "fourth argument" is provided, eval it as part of the "else"
         return eval(cddr(args), env);
@@ -384,34 +425,41 @@ cell if_fn(cell args, cell env) {
         return eval(cddar(args), env);
 }
 
+
 cell evalmap(cell args, cell env) {
     if (!args) return NIL;
     cell first = eval(car(args), env);
-    cell rest = evalmap(cdr(args), env);
+    cell rest = cdr(args);
+    if (CELL_TYPE(rest) == PAIR)
+        rest = evalmap(cdr(args), env);
+    else
+        rest = eval(cdr(args), env);
+    
     return cons(first, rest);
 }
-
 
 cell eval(cell c, cell env) {
     switch (CELL_TYPE(c)) {
         case PAIR: {
             DPRINTF("Evalling %s\n", leaky_print(c));
-            // () -> ()
+            // () x -> () x
             if (!car(c)) return c;
             cell first = eval(car(c), env);
             cell rest = cdr(c);
             // (f x) -> f x
-            if (!cdr(c)) return first;
+            if (!rest) return first;
             if (CELL_TYPE(first) == LAMBDA || CELL_TYPE(first) == BUILTIN_FUNCTION ||
                 CELL_TYPE(first) == FFI_FUNCTION) {
                 if (CELL_TYPE(first) != BUILTIN_FUNCTION || !CELL_DEREFERENCE(first).hold_args)
                     rest = evalmap(rest, env);
                 return apply(LIST2(first, rest), env);
             }
+            if (!ispair(LIST1(rest))) return cons(eval(first, env), eval(rest, env));
             return cons(first, evalmap(rest, env));
         }
         case SYMBOL: {
             cell resolved_symbol = assoc(LIST2(c, env));
+//            DPRINTF("Looked up %s in %s, found %s\n", leaky_print(c), leaky_print(env), leaky_print(resolved_symbol));
             if (resolved_symbol) return cdr(resolved_symbol);
             char* sym_name = CELL_DEREFERENCE(c).symbol;
             cell ffi_fn = find_ffi_function(sym_name, env);
@@ -430,11 +478,15 @@ cell eval(cell c, cell env) {
 cell def(cell args, cell env) {
     cell referent = eval(cdr(args), env);
     cell var_name = car(args);
+    DPRINTF("Defining %s -> %s\n", leaky_print(var_name), leaky_print(referent));
     cdr(global_env) = cons(cons(var_name, referent), cdr(global_env));
     return NIL;
 }
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc >= 2 && !strcmp(argv[1], "debug"))
+        debug = true;
+
     //                                                         with_env, hold_args
     global_env = cons(cons(sym("if"), make_builtin_function(if_fn, true, true)), env_base);
     global_env = cons(cons(sym("eval"), make_builtin_function(eval, true, false)), global_env);

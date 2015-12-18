@@ -10,12 +10,19 @@ pass
 ; () is nil - the only false-y cell;
 ; everything else is considered true
 
+
 ; if evaluates and returns its second arg if the first is true
 ; otherwise it evaluates and returns the third arg
 if 1 pass fail
-if () fail pass
+if nil fail pass
+if nil fail else pass
 
 test 1 1
+
+test '1 1
+test 'a a
+test '(1 . 1) (1 . 1)
+test '(a . (b . (c . nil))) (a b c)
 
 ; The quote function returns its arguments (a list) unevaluated
 ; 'cdr is syntactic sugar for (quote . cdr)
@@ -25,33 +32,33 @@ test '(car (quote cdr)) 'cdr
 test '(eval sum 1 2) 3
 test '(eval '(car (cons a b))) a
 
-test '(not ()) true
+test '(not nil) true
 test '(not (not true)) true
 
 test '(and foo bar) bar
-test '(not (and foo ())) true
-test '(not (and () foo)) true
-test '(not (and () ())) true
+test '(not (and foo nil)) true
+test '(not (and nil foo)) true
+test '(not (and nil nil)) true
 
 ; ispair returns its single argument if it is a pair; otherwise nil
 test '(not (ispair a)) true
 test '(car (ispair (a b))) a
 
-test '(list-equal () ()) true
+test '(list-equal nil nil) true
 test '(list-equal (a b) (a b)) true
-test '(list-equal (() b) (() b)) true
+test '(list-equal (nil b) (nil b)) true
 
-test '(not (list-equal (a ()) (a b))) true
+test '(not (list-equal (a nil) (a b))) true
 test '(not (list-equal (a d f) (a f d))) true
 
-test '(or foo ()) foo
-test '(or () foo) foo
+test '(or foo nil) foo
+test '(or nil foo) foo
 test '(or foo foo) foo
-test '(nor () ()) true
+test '(nor nil nil) true
 
 ; f is not defined here so it is left unevaluated.
-;test '(reduce f (1 2 3) 0) (f 1 (f 2 (f 3 0)))
-; waiting to test this until we have a function for recursively comparing complex lists
+test '(reduce f (1 2 3) 0) (f 1 (f 2 (f 3 0)))
+test '(map f (1 2 3)) ((f 1) (f 2) (f 3))
 
 test '(reduce sum (1 2 3) 0) 6
 
@@ -66,24 +73,24 @@ test '(sumlist (1 2 3 4)) 10
 test '(map sumlist ((2 4 6) (1 3 5 7) (2 3))) (12 16 5)
 
 test '(all (1 2 foo bar)) true
-test '(all (1 2 () bar)) ()
-test '(all ()) true
+test '(all (1 2 nil bar)) nil
+test '(all nil) true
 
 test '(any (1 2 foo bar)) 1
-test '(any (1 2 () bar)) 1
-test '(any (() () ())) ()
-test '(any ()) ()
+test '(any (1 2 nil bar)) 1
+test '(any (nil nil nil)) nil
+test '(any nil) nil
 
-test '(none (1 2 foo bar)) ()
-test '(none (1 2 () bar)) ()
-test '(none (() () ())) true
-test '(none (())) true
-test '(none ()) true
+test '(none (1 2 foo bar)) nil
+test '(none (1 2 nil bar)) nil
+test '(none (nil nil nil)) true
+test '(none (nil)) true
+test '(none nil) true
 
 ; asc: return the minimum arg if args are in strictly ascending order
 ;      otherwise nil
 test '(asc 1 2 3) 1
-test '(asc 3 2 1) ()
+test '(asc 3 2 1) nil
 
 ; sum: return the sum of its arguments
 test '(sum 1 2 3 4) 10
@@ -142,19 +149,30 @@ test '(car (cdr ((lambda (a b) list a b) 1 2))) 2
 test '(filter (lambda x (asc 0 x)) (4 -5 2 -67 0)) (4 2)
 
 ; filtering an empty list yields an empty list
-test '(filter sum ()) ()
+test '(filter sum nil) nil
 
 ; filtering with the identity function does not affect the list
 test '(filter (lambda x x) (a b c)) (a b c)
 
-test '(reverse ()) ()
+test '(concat (a b c d) (x y z)) (a b c d x y z)
+test '(concat nil (x y z)) (x y z)
+test '(concat (a b c d) nil) (a b c d)
+test '(concat nil nil) nil
+
+test '(reverse nil) nil
 test '(reverse (a b c)) (c b a)
 
 test '(range 4) (0 1 2 3)
-test '(range -1) ()
+test '(range -1) nil
 
-test '(void (sum 1 2 3)) ()
+test '(repeat z 3) (z z z)
+test '(repeat z 0) nil
+test '(repeat nil 2) (nil nil)
+
+test '(zip (a b c) (1 2 3)) ((a . 1) (b . 2) (c . 3))
+
+test '(void (sum 1 2 3)) nil
 
 void (libc.puts
-        (glib.g_base64_decode SWYgeW91J3JlIHJlYWRpbmcgdGhpcywgYmFzZTY0IHdpdGggZ2xpYiB3b3JrcwA=
+        (glib.g_base64_decode cGFzczogZ2xpYiBiYXNlNjQgd29ya3M=
         (libc.malloc 4)))
