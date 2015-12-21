@@ -243,6 +243,8 @@ cell evalmap(cell args, cell env) {
 }
 
 cell eval(cell c, cell env) {
+    // Hack to limit recursion depth
+    // It is otherwise trivial to crash the interpeter with infinite recursion
     if (stack_base - (char*) (&c) > 0x40000) DIE("Stack overflowed");
     if IS_PAIR(c) {
         DPRINTF("Evalling %s in %s\n", print_cell(c), print_env(env));

@@ -3,7 +3,12 @@
 #include "crisp.h"
 #include <stdarg.h>
 
+// Returns the cell represented by the string starting at *s
+// The mechanics of this function are strange. *s advances
+// along the string while parse constructs the corresponding
+// lists
 cell parse(char** s) {
+    // Skip whitespace
     while (isspace(**s)) (*s)++;
     if (!**s) return NIL;
     switch (**s) {
@@ -41,15 +46,16 @@ cell parse(char** s) {
         default: {
             char* i = *s;
             while (*i && !isspace(*i) && *i != '(' && *i != ')') i++;
-            int token_len = i - *s;
+            size_t token_len = i - *s;
+
             char* token = strncpy(GC_MALLOC_ATOMIC(token_len + 1), *s, token_len);
             token[token_len] = '\0';
             *s = i;
             cell c;
 
+            // Try to turn the token into a number
             char* endptr;
             long val = strtol(token, &endptr, 0);
-
             if (endptr != token) c = make_s64(val);
             else c = sym(token);
 
@@ -59,16 +65,18 @@ cell parse(char** s) {
 }
 
 static char* buf = NULL;
-static int buf_len = 0;
+static size_t buf_len = 0;
 static int buf_index = 0;
 
+// A combination of sprintf and strcat, catf safely appends formatted
+// strings to the end of the buffer, enlarging the buffer as needed
 inline static int catf(char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
     char* new_part;
     vasprintf(&new_part, fmt, args);
     va_end(args);
-    int extra_len = strlen(new_part);
+    size_t extra_len = strlen(new_part);
     if (buf_index + extra_len >= buf_len) {
         buf = GC_REALLOC(buf, buf_len = (buf_index + extra_len) * 2);
     }
@@ -77,9 +85,11 @@ inline static int catf(char* fmt, ...) {
     return buf_index += extra_len;
 }
 
+// Recursive print function - updates buf_index as appropriate
+// during its traversal of c
 static int print(cell c) {
     switch (CELL_TYPE(c)) {
-        case PAIR: {
+        case PAIR:
             if (CELL_TYPE(car(c)) == PAIR) {
                 catf("(");
                 print(car(c));
@@ -92,7 +102,6 @@ static int print(cell c) {
             if (CELL_TYPE(cdr(c)) != PAIR)
                 catf(". ");
             return print(cdr(c));
-        }
         case S64:
             return catf("%ld", CELL_DEREF(c).s64);
         case SYMBOL:
@@ -124,14 +133,15 @@ char* print_cell(cell c) {
     return buf;
 }
 
+// Handy for pretty-printing local variables in an env
 char* print_env(cell c) {
-    if(!c) return "";
-    if(!strcmp(CELL_PTR(caar(c))->symbol, "LOCALS-OVERHEAD")) return "()";
+    if (!c) return "";
+    if (!strcmp(CELL_PTR(caar(c))->symbol, "GLOBALS")) return "()";
     buf = GC_MALLOC(64);
     buf_len = 64;
     buf_index = 0;
     catf("(\n");
-    while (c && strcmp(CELL_PTR(caar(c))->symbol, "LOCALS-OVERHEAD")) {
+    while (c && strcmp(CELL_PTR(caar(c))->symbol, "GLOBALS")) {
         print(car(c));
         catf("\n");
         c = cdr(c);

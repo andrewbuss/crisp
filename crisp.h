@@ -7,6 +7,8 @@
 #include <string.h>
 #include <ctype.h>
 
+// The top 16 bits of the 64 bit address space are unused
+// Type information is stored there instead
 #define CELL_TYPE(x) (((uint64_t)x)&0xffff000000000000)
 #define CELL_PTR(x) ((_cell*)((x)&0xffffffffffff))
 #define CELL_DEREF(x) (*CELL_PTR(x))
@@ -19,7 +21,7 @@
 #define cddar(c) car(cdr(cdr(c)))
 #define cdddr(c) cdr(cdr(cdr(c)))
 #define LIST1(a) cons((a), NIL)
-#define LIST2(a, ...) cons((a), LIST1(__VA_ARGS__))
+#define LIST2(a, b) cons((a), cons((b), NIL))
 #define IS_CALLABLE(c) (CELL_TYPE(c) == LAMBDA || CELL_TYPE(c) == FFI_FUNCTION || CELL_TYPE(c) == BUILTIN_FUNCTION)
 #define IS_S64(c) (CELL_TYPE(c) == S64)
 #define IS_PAIR(c) (CELL_TYPE(c) == PAIR)
@@ -35,36 +37,37 @@ enum celltype {
     LAMBDA = 0x4000000000000,
     BUILTIN_FUNCTION = 0x5000000000000,
     FFI_FUNCTION = 0x6000000000000,
-    FFI_LIBRARY = 0x7000000000000,
-    MACRO = 0x8000000000000
+    FFI_LIBRARY = 0x7000000000000
 };
 
 typedef uintptr_t cell;
 typedef union _cell {
-    struct {
+    struct { // PAIR
         cell car;
         cell cdr;
     };
-    struct {
+    struct { // LAMBDA
         cell def;
         cell env;
     };
-    struct {
+    struct { // S64
         int64_t s64;
     };
-    struct {
+    struct { // SYMBOL
         char* symbol;
     };
-
-    struct {
+    struct { // BUILTIN_FUNCTION, FFI_FUNCTION
         union {
             cell(* fn)();
         };
 
+        // Indicates whether this function accepts a second env parameter
         int with_env:1;
+
+        // Indicates whether to hold arguments unevaluated before application
         int hold_args:1;
     };
-    struct {
+    struct { // FFI_LIBRARY
         void* handle;
     };
 } _cell;
