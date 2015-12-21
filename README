@@ -32,13 +32,13 @@ Building:
 
 Some syntax examples and testing code are in the tests file. Run tests:
 
-    cat stdlib.crisp tests.crisp | ./crisp
+    cat stdlib.crisp tests.crisp | crisp
 
 Run as a REPL:
 
-    cat stdlib.crisp - | ./crisp
+    cat stdlib.crisp - | crisp
 
-Language notes:
+Syntax notes:
 
     Whitespace is generally ignored. An exception, in order to work as a REPL,
     is that lines are evaluated after each newline, unless there are unclosed
@@ -54,10 +54,10 @@ Language notes:
     be evaluated if the predicate is non-nil. If only two arguments are
     supplied and the predicate is nil, nil is returned. If the predicate is
     nil, everything after the second argument is evaluated. This allows an
-    easier syntax for chaining if's. The def function works similarly;
+    easier syntax for chaining if's. The lambda function works similarly;
     evaluating everything after the first argument as a referent. Example:
 
-        def fizzbuzz lambda x (
+        def fizzbuzz (lambda x
             with fizz (equal (modulus x 3) 0)
             with buzz (equal (modulus x 5) 0)
             if (and fizz buzz)
@@ -73,15 +73,76 @@ Language notes:
         ; FizzBuzz 1 2 Fizz 4 Buzz Fizz 7 8 Fizz Buzz
           11 Fizz 13 14 FizzBuzz 16 17 Fizz 19
 
+Evaluation notes:
+
+    A list is evaluated by examining its head. If the head is callable, and
+    isn't a special function (examples include def, quote, lambda), which
+    holds evaluation for its arguments, the arguments are evaluated and the
+    function is applied. If the head is not callable, each element of the list
+    is independently evaluated and the resulting list is returned.
+
+    The behavior of C functions is unconstrained, although the interface is
+    defined: a C function accepts a cell which may be either NIL or a PAIR,
+    and returns a cell which may be of any type.
+
+    Little is specified about the behavior of FFI functions - the interface
+    is not stable enough to describe yet. Roughly, an FFI_FUNCTION can be
+    applied to integer or symbol arguments. Symbol arguments are passed as
+    pointers to the underlying strings, so (libc.puts foo) prints "foo\n".
+    The return value of an FFI_FUNCTION is always assumed to be an integer.
+    This means that (libc.malloc 4096) will return an integer pointer which
+    can be passed to libc.gets or libc.free, for example.
+
+    Finally, lambdas are evaluated by evaluating the body of a lambda in a new
+    environment where the names in the lambda args list are mapped to the
+    corresponding values to which the lambda is being applied. This new
+    environment is stacked atop the environment in which the lambda was
+    created, so variables may override other local variables, but global
+    definitions are still accessible
+
+    For example, to evaluate
+
+        with z 4 (def lambda (x y) sum y (product z x))
+
+        f 3 7
+
+    the interpreter first pairs x with 3 and y with 7 to yield a new env
+    concatenated with the existing environment:
+
+        (x . 3) (y . 7) (z . 4) ... [ other globals ] .. [ builtins ]
+
+    Then it evaluates the body of the lambda in this environment, obtaining:
+
+        sum y (product z x) ->
+            y -> 7
+            product z x ->
+                z -> 4
+                x -> 3
+            -> apply product 4 3 -> 12
+        -> apply sum 7 12 -> 19
+
 Implementation notes:
 
     For simplicity we avoid C "fast-paths", preferring instead to use lispish
     primitives, even in C. For example, the C assoc implementation is recursive
     even though it could be implemented iteratively instead to improve
-    performance
+    performance. Other functions are most simply expressed recursively.
 
-    There is no special "environment" struct. The environment is a list
-    containing mappings between variable names and their values.
+    There is no special "environment" struct. The environment is a normal list
+    containing dotted-pair mappings between variable names and their values.
+
+    The intention is to implement only the minimum functionality in C required
+    to implement higher-level functionality in the crisp language, such as map,
+    filter, defrec, and, via the FFI, libc, and glib, I/O of some sort.
+
+    At present, crisp uses the Boehm-Demers-Weiser (http://www.hboehm.info/gc/)
+    garbage collector rather than including one of its own. A reference counted
+    system is a goal of later work.
+
+    The FFI functionality is exciting because it allows reuse of libraries from
+    many other projects with very little extra C code in crisp, Between glib
+    and libc, crisp in theory has a decently sized general purpose library.
+    libsdl2 is another exciting option.
 
 Fuzzing:
 
@@ -99,8 +160,8 @@ Fuzzing:
     Prepare directories for afl:
 
         mkdir inputs afl_state
-        echo "(lambda x y y x) 4 2" > inputs/simple
+        echo "(lambda (x y) y x) 4 2" > inputs/simple
 
     Run afl with a 200 MB memory limit:
 
-        afl-fuzz -m 200 -x afl_dict.txt -i inputs -o afl_state ./crisp_fuzz
+        afl-fuzz -m 200 -x fuzzing/afl_dict.txt -i inputs -o afl_state ./crisp_fuzz

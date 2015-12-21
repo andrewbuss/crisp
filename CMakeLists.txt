@@ -13,7 +13,7 @@ add_executable(crisp_noffi EXCLUDE_FROM_ALL crisp.c interpreter.c parse.c math.c
 target_compile_definitions(crisp_noffi PRIVATE DISABLE_FFI)
 target_link_libraries(crisp_noffi gc-lib ${CMAKE_THREAD_LIBS_INIT})
 
-add_executable(crisp_fuzz_parser EXCLUDE_FROM_ALL fuzz_parser.c crisp.c parse.c math.c )
+add_executable(crisp_fuzz_parser EXCLUDE_FROM_ALL fuzzing/fuzz_parser.c crisp.c parse.c math.c )
 target_compile_definitions(crisp_fuzz_parser PRIVATE DISABLE_FFI)
 target_compile_definitions(crisp_fuzz_parser PUBLIC GC_malloc=malloc GC_malloc_atomic=malloc GC_realloc=realloc)
 

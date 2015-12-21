@@ -11,9 +11,7 @@ def defrec lambda (name args body) (
     with outer (eval lambda name inner)
     eval def name makerec outer)
 
-def withrec lambda (name args body rest) (
-    (with inner (eval lambda args body)
-     with outer (eval lambda name inner)
+
 defrec factorial n '(
     if (equal n 0)
         1
