@@ -1,0 +1,31 @@
+; Key/value pairs are stored as:
+; (hash <left subtree> <right subtree> (key1 . value1) (key2 . value2) ... )
+
+with lookup_hash (lambda (tree hash) (
+    with key_hash (hash key)
+    with recursive_lookup (lambda node (
+    	if (not node)
+	    nil
+	with node_hash (car node)
+	if (equal key_hash node_hash)
+	    (cdr (cdr (cdr node)))
+	if (asc key_hash node_hash)
+	    (recursive_lookup (cdar node))
+	(recursive_lookup (cddar node))))
+    recursive_lookup tree hash
+)
+
+
+; Insert returns a new binary tree with (key -> val) inserted
+with insert (lambda (tree key val) (
+    with key_hash (hash key)
+    with recursive_insert (lambda node (
+        if (not node)
+	   (key_hash . key)
+	with node_hash (caar node)
+	with node_key (cadr node)
+	    if (equal node_hash key_hash) (
+	        if (equal node_key key)
+		    ((car node) . val)
+		(car node))
+	    if (
