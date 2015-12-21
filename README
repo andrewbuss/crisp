@@ -92,4 +92,16 @@ Fuzzing:
     worrying idea. GC tends to clog up the fuzzer with extra logic and control
     flow, and isn't needed for short executions.
 
-    Build the slimmer
+    Build the slimmer crisp:
+
+        make crisp_fuzz
+
+    Prepare directories for afl:
+
+        mkdir inputs afl_state
+        echo "(lambda x y y x) 4 2" > inputs/simple
+
+    Run afl with a 200 MB memory limit:
+
+        afl-fuzz -m 200 -x afl_dict.txt -i inputs -o afl_state ./crisp_fuzz
+    
