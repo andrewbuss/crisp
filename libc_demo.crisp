@@ -1,0 +1,42 @@
+def libc dlopen libc.so.6
+
+; The void function discards its argument so crisp
+; doesn't print the return value of puts
+void (libc.puts hello!)
+
+I rate this:
+void (libc.printf %d/%d 11 10) (libc.putchar 0xA)
+
+void (with buffer (libc.malloc 20)
+    map void (
+        (libc.sprintf buffer xXx%d%sxXx 0x539 CRISP)
+        (libc.puts buffer)
+        (libc.free buffer)))
+
+Current user:
+void (libc.system whoami)
+Current directory:
+void (libc.system pwd)
+
+(
+    ; open the README
+    with infile (libc.fopen README r)
+
+    ; read up to 1023 bytes of a line into an allocated buffer
+    with getline (lambda f libc.fgets (libc.malloc 1024) 1023 infile)
+
+    ; get 20 lines from infile
+    with lines (map getline (repeat infile 30))
+
+    ; let's remove anything that's just a newline
+    def lines (filter (lambda line neq (libc.strlen line) 1) lines)
+)
+
+; print out each line
+void (map libc.puts lines)
+
+; how long is each line?
+Line lengths: (map libc.strlen lines)
+
+; be a good citizen and free each buffer
+void (map libc.free lines)

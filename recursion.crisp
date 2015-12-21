@@ -1,0 +1,26 @@
+def inc lambda x sum x 1
+def dec lambda x sum x -1
+
+; the Y combinator
+def makerec lambda f (
+    (lambda x x x)
+    (lambda x f (lambda y (x x) y)))
+
+def defrec lambda (name args body) (
+    with inner (eval lambda args body)
+    with outer (eval lambda name inner)
+    eval def name makerec outer)
+
+def withrec lambda (name args body rest) (
+    (with inner (eval lambda args body)
+     with outer (eval lambda name inner)
+defrec factorial n '(
+    if (equal n 0)
+        1
+        product n (factorial (dec n)))
+
+defrec fibpair x '(
+    if (asc x 2)
+        (1 1)
+    (apply (lambda (a b) b (sum a b))
+    (fibpair (dec x))))
