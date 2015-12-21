@@ -104,4 +104,3 @@ Fuzzing:
     Run afl with a 200 MB memory limit:
 
         afl-fuzz -m 200 -x afl_dict.txt -i inputs -o afl_state ./crisp_fuzz
-    
