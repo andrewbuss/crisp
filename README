@@ -1,31 +1,95 @@
 crisp: a C lisp
 
-Build with:
+Repo contents:
 
-    CFLAGS="-lgc -ldl -Wall" make crisp
+    crisp.h       : header file with all builtin definitions
+    crisp.c       : the core, including cell allocation and evaluation
+    parse.c       : routines for converting between cells and strings
+    math.c        : routines for numbers
+    ffi.c         : routines supporting the foreign function interface
+    interpreter.c : REPL
 
-Some syntax documentation and testing code is in the tests file.
-Run tests:
+    fuzz_parser.c : a small program to exercise the parser and verify
+                    round-trip stability. Only useful for fuzzing
+
+    stdlib.crisp    : a prelude containing many useful functions for tests:
+                      nil, not, and, nand, or, nor, neq, dec, inc,
+                      void, makerec, defrec, test, testwith, list-equal,
+                      c{a,d}{a,d}r, reduce, map, all, any, none, filter,
+                      reverse-concat, reverse, reversed-range, range,
+                      repeat, zip, len
+    tests.crisp     : an assortment of tests and additional syntax examples
+    libc_demo.crisp : a few examples using the FFI with libc
+    bintree.crisp   : an implementation of a basic persistent binary tree map
+
+Building:
+
+    git submodule update --init
+    ln -s ../libatomic_ops bdwgc/libatomic_ops
+    cmake .
+    make crisp
+    make install
+
+Some syntax examples and testing code are in the tests file. Run tests:
 
     cat stdlib.crisp tests.crisp | ./crisp
 
-A minimal set of functions is implemented in C, but friendlier functions
-like "and" and "not" are defined in the stdlib.crisp file.
-
-Source those and start the interpreter:
+Run as a REPL:
 
     cat stdlib.crisp - | ./crisp
 
-The intent of the interpreter architecture is to first implement the simple
-cell data structure, then implement lisp primitives - cons, car, equal -
-using only these data structures, then to finally implement
-eval, apply, if, lambda, etc using these primitives. The result is that there
-is a single stack (shaped like a linked list) of symbol/value pairs. Each
-symbol lookup requires a full O(n) scan of this stack. A hash table would
-surely be faster but would require deviation from the pure list approach.
+Language notes:
 
-The major limitation at present is the hilariously naive garbage collection.
-After evaluating each line, the interpreter recurses through the
-global environment and copies live cells over to a new arena. This places a
-hard cap on the number of cells which can be allocated while evaluating each
-logical line.
+    Whitespace is generally ignored. An exception, in order to work as a REPL,
+    is that lines are evaluated after each newline, unless there are unclosed
+    parentheses. Example:
+
+        sum 1 2 3  ; result: 6
+        4 5        ; result: 4 5
+
+        (sum 1 2 3
+             4 5)  ; result: 15
+
+    The if function takes two required arguments: a predicate and a clause to
+    be evaluated if the predicate is non-nil. If only two arguments are
+    supplied and the predicate is nil, nil is returned. If the predicate is
+    nil, everything after the second argument is evaluated. This allows an
+    easier syntax for chaining if's. The def function works similarly;
+    evaluating everything after the first argument as a referent. Example:
+
+        def fizzbuzz lambda x (
+            with fizz (equal (modulus x 3) 0)
+            with buzz (equal (modulus x 5) 0)
+            if (and fizz buzz)
+                FizzBuzz
+            if fizz
+                Fizz
+            if buzz
+                Buzz
+            x)
+
+        map fizzbuzz (range 20)
+        ; output:
+        ; FizzBuzz 1 2 Fizz 4 Buzz Fizz 7 8 Fizz Buzz
+          11 Fizz 13 14 FizzBuzz 16 17 Fizz 19
+
+Implementation notes:
+
+    For simplicity we avoid C "fast-paths", preferring instead to use lispish
+    primitives, even in C. For example, the C assoc implementation is recursive
+    even though it could be implemented iteratively instead to improve
+    performance
+
+    There is no special "environment" struct. The environment is a list
+    containing mappings between variable names and their values.
+
+Fuzzing:
+
+    Automated fuzzing is a fun way to catch bugs. CMake targets are included
+    building crisp without FFI or GC. FFI yields a lot of false positives when
+    a fuzzer discovers it can pass a garbage pointer to libc.free for example.
+    Allowing the fuzzer to call arbitrary external code is also simply a
+    worrying idea. GC tends to clog up the fuzzer with extra logic and control
+    flow, and isn't needed for short executions.
+
+    Build the slimmer
