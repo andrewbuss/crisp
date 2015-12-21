@@ -112,37 +112,34 @@ testwith test (a 1) (fail: a != 1)
 testwith test ((a a) (a a)) (pass: (a a) == (a a))
 
 ; boring recursive example
-(
-    with factorial (defrec x '(
+defrec factorial x '(
         if (asc x 1)
             1
-            (product x (factorial (dec x)))))
+            (product x (factorial (dec x))))
 
-    testwith factorial 19 121645100408832000
-)
+test '(factorial 19) 121645100408832000
 
-;defrec fib x '(
-;        if (asc x 2)
-;            x
-;            (sum (fib (dec x)) (fib (sum x -2))))
+
 
 ; *exciting* and slow recursive example
-(
+defrec fib x '(
+        if (asc x 2)
+            x
+            (sum (fib (dec x)) (fib (sum x -2))))
 
+test '(fib 10) 55
 
-    test '(fib 10) 55
-)
 
 defrec fibpair x '(
         if (asc x 2)
             (1 1)
             (apply (lambda (a b) b (sum a b))
-                   (fibpair (dec x))))
+                   (fibpair (dec x))))fib
 
 ; faster recursive example
 (
     with fib (lambda z car (fibpair z))
-    test (fib 92) 7540113804746346429
+    testwith fib 92 7540113804746346429
 )
 
 ; some lambda regression tests
@@ -195,7 +192,7 @@ test '(with x 2 x) 2
 test '(with x 2 with y 6 sum x y) 8
 
 ; check that `with` doesn't affect the outer scope
-test 'x 'x
+(lambda (x y) y) (with x () foo) (test '(not (ispair x)) true)
 
 ; override builtin functions as needed
 test '(with sum (lambda x product x x) sum 5 5) 25

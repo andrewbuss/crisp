@@ -17,8 +17,12 @@ defrec factorial n '(
         1
         product n (factorial (dec n)))
 
+factorial 19
+
 defrec fibpair x '(
     if (asc x 2)
         (1 1)
     (apply (lambda (a b) b (sum a b))
     (fibpair (dec x))))
+
+fibpair 92

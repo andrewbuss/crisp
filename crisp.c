@@ -138,7 +138,10 @@ cell concat(cell args) {
     if (!args) return NIL;
     cell first = car(args);
     cell rest = cdr(args);
-    if (!rest) return first;
+    if (!rest) {
+        if (!first || IS_PAIR(first)) return first;
+        else return LIST1(first);
+    }
     if (!IS_PAIR(rest)) rest = LIST1(rest);
     if (!first) return concat(rest);
     if (!IS_PAIR(first)) first = LIST1(first);

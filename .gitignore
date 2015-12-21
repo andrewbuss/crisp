@@ -6,5 +6,10 @@ CMakeFiles
 CMakeCache.txt
 crisp_noffi
 crisp_fuzz_parser
+crisp_fuzz
+build
+build_fuzz
+install_manifest.txt
 fuzz
 peda-session-*
+Makefile
