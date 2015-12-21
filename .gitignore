@@ -1,3 +1,10 @@
 *~
 .*
 crisp
+*.cmake
+CMakeFiles
+CMakeCache.txt
+crisp_noffi
+crisp_fuzz_parser
+fuzz
+peda-session-*
