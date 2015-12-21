@@ -1,5 +1,5 @@
-; These are the docs and also the test cases. Each logical line
-; in this script should evaluate to pass
+; These are some test cases which highlight and exercise functionality.
+; Each logical line in this script should evaluate to pass
 
 ; Comments are prefixed by ; and continue to the end of the line
 ; Whitespace and newlines are ignored
@@ -12,10 +12,13 @@ pass
 
 
 ; if evaluates and returns its second arg if the first is true
-; otherwise it evaluates and returns the third arg
+; otherwise it evaluates the remaining args
 if 1 pass fail
 if nil fail pass
-if nil fail else pass
+
+; these are also valid
+if 1 pass
+if 1
 
 test 1 1
 
@@ -25,8 +28,12 @@ test '(1 . 1) (1 . 1)
 test '(a . (b . (c . nil))) (a b c)
 
 ; The quote function returns its arguments (a list) unevaluated
-; 'cdr is syntactic sugar for (quote . cdr)
-test '(car (quote cdr)) 'cdr
+; 'cdr is syntactic sugar for (quote cdr)
+test '(quote cdr) 'cdr
+test ''cdr (quote cdr)
+test ''() '()
+test ''cdr 'cdr
+test ''(car cdr cons) '(car cdr cons)
 
 ; The eval function evaluates its argument
 test '(eval sum 1 2) 3
@@ -66,11 +73,11 @@ test '(reduce sum (1 2 3) 0) 6
 test '(sum 1 2 3 4) 10
 
 ; but if we apply sum to a list, we achieve the equivalent result
-def sumlist lambda l apply sum l
-test '(sumlist (1 2 3 4)) 10
+test '((lambda l apply sum l) (1 2 3 4)) 10
+test '(apply inc 2) 3
 
 ; now we can test map
-test '(map sumlist ((2 4 6) (1 3 5 7) (2 3))) (12 16 5)
+test '(map (lambda l apply sum l) ((2 4 6) (1 3 5 7) (2 3))) (12 16 5)
 
 test '(all (1 2 foo bar)) true
 test '(all (1 2 nil bar)) nil
@@ -101,34 +108,42 @@ test '(product 1 2 3 4) 24
 ; (apply f '(a b c)) is equivalent to (f a b c)
 test '(apply sum '(1 2 3 4)) 10
 
-; boring recursive example
-def factorial lambda x (
-    if (asc x 1)
-        1
-        (product x (factorial (sum x -1))))
+testwith test (a 1) (fail: a != 1)
+testwith test ((a a) (a a)) (pass: (a a) == (a a))
 
-test '(factorial 19) 121645100408832000
+; boring recursive example
+(
+    with factorial (defrec x '(
+        if (asc x 1)
+            1
+            (product x (factorial (dec x)))))
+
+    testwith factorial 19 121645100408832000
+)
+
+;defrec fib x '(
+;        if (asc x 2)
+;            x
+;            (sum (fib (dec x)) (fib (sum x -2))))
 
 ; *exciting* and slow recursive example
-def fib lambda x (
-    if (asc x 2)
-        x
-        (sum (fib (sum x -1)) (fib (sum x -2))))
+(
 
-test '(fib 10) 55
+
+    test '(fib 10) 55
+)
+
+defrec fibpair x '(
+        if (asc x 2)
+            (1 1)
+            (apply (lambda (a b) b (sum a b))
+                   (fibpair (dec x))))
 
 ; faster recursive example
-def fibpair lambda x (
-    if (asc x 2)
-        (1 1)
-        (apply  (lambda (a b) b (sum a b))
-                (fibpair (sum x -1))))
-
-
-def fib lambda x (car (fibpair x))
-
-test '(fibpair 10) (55 89)
-test '(fib 92) 7540113804746346429
+(
+    with fib (lambda z car (fibpair z))
+    test (fib 92) 7540113804746346429
+)
 
 ; some lambda regression tests
 
@@ -157,6 +172,9 @@ test '(filter (lambda x x) (a b c)) (a b c)
 test '(concat (a b c d) (x y z)) (a b c d x y z)
 test '(concat nil (x y z)) (x y z)
 test '(concat (a b c d) nil) (a b c d)
+test '(concat a (b c d)) (a b c d)
+test '(concat (a b c) d) (a b c d)
+test '(concat (a b c) d () (e f g) h ) (a b c d e f g h)
 test '(concat nil nil) nil
 
 test '(reverse nil) nil
@@ -173,6 +191,28 @@ test '(zip (a b c) (1 2 3)) ((a . 1) (b . 2) (c . 3))
 
 test '(void (sum 1 2 3)) nil
 
-void (libc.puts
-        (glib.g_base64_decode cGFzczogZ2xpYiBiYXNlNjQgd29ya3M=
-        (libc.malloc 4)))
+test '(with x 2 x) 2
+test '(with x 2 with y 6 sum x y) 8
+
+; check that `with` doesn't affect the outer scope
+test 'x 'x
+
+; override builtin functions as needed
+test '(with sum (lambda x product x x) sum 5 5) 25
+test '(sum 5 5) 10
+
+(
+    with libc (dlopen libc.so.6)
+    with glib (dlopen libglib-2.0.so)
+
+    void (libc.puts
+            (glib.g_base64_decode cGFzczogZ2xpYiBiYXNlNjQgd29ya3M=
+                (libc.malloc 4)))
+)
+
+(
+    with libc (dlopen libc.so.6)
+    with puts (lambda l void ((map libc.putchar l) (libc.putchar 0xa)))
+    puts (112, 97, 115, 115, 58, 32, 108, 105, 98, 99, 32, 112, 117, 116, 99, 104, 97, 114, 32, 119, 111, 114, 107, 115)
+)
+

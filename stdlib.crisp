@@ -1,10 +1,10 @@
 def nil
 
 ; the opposite of nil is true
-def not lambda a if a () true
+def not lambda a if a nil true
 
 ; if a and b are non-nil, return b
-def and lambda (a b) if a b ()
+def and lambda (a b) if a b nil
 def nand lambda (a b) not (and a b)
 
 ; return a if either a or b are non-nil
@@ -13,36 +13,53 @@ def nor lambda (a b) not (or a b)
 def neq lambda (a b) not (equal a b)
 
 def dec lambda x (sum x -1)
+def inc lambda x (sum x 1)
 
-; if more than three arguments are passed to the if function,
-; everything past the second is treated as the "else"
-; .. including another if!
-def list-equal lambda (a b) (
-    if (nor a b)                         ; if both are nil, these are equal
-        true
-    if (nand a b)                        ; but if just one is nil, they are not
-        ()
-    if (nor (ispair a) (ispair b))       ; if neither is a pair, compare directly
-        (equal a b)
-    if (nand (ispair a) (ispair b))      ; but if just one is a pair, they are not equal
-        ()
-    and (list-equal (car a) (car b))  ; both are pairs, so recursively compare them
-        (list-equal (cdr a) (cdr b))
+; evaluate arguments and return NIL
+; useful for functions with side-effects
+def void lambda _
+
+
+; the Y combinator
+def makerec lambda f (
+    (lambda x x x)
+    (lambda x f (lambda y (x x) y)))
+
+def defrec lambda (name args body) (
+    with inner (eval lambda args body)
+    with outer (eval lambda name inner)
+    eval def name makerec outer)
+
+
+void (
+    with list-equal (lambda (a b)
+        if (nor a b)                         ; if both are nil, these are equal
+            true
+        if (and a b) (                       ; but either is nil, they are not
+            if (nor (ispair a) (ispair b))   ; if neither is a pair, compare directly
+                (equal a b)
+            if (and (ispair a) (ispair b)) (      ; but if either is not a pair, they are not equal
+                and (list-equal (car a) (car b))  ; both are pairs, so recursively compare them
+                    (list-equal (cdr a) (cdr b))))
+    )
+
+    (def test lambda (actual expected)
+        if (list-equal (eval actual) expected)
+            (pass: actual == expected)
+        (fail: actual != expected))
+
+    (def testwith lambda (f x expected)
+        with actual (apply f x)
+        if (list-equal actual expected)
+            (pass: f x == expected)
+        (fail: f x != expected))
+    (def list-equal list-equal)
 )
 
-; def recursive-equal lambda (a b) (
-; The outer parentheses are used here to include
-; the entire definition in the same logical line
-
-; Since the if statement comprises the entire lambda body,
-; the parentheses would not be necessary if we put the
-; definition all on one input line
-
-def test lambda (actual expected) (
-    if (list-equal (eval actual) expected)
-        (pass: actual == expected)
-    fail: actual != expected
-)
+def caar lambda x car (car x)
+def cddr lambda x cdr (cdr x)
+def cdar lambda x car (cdr x)
+def cadr lambda x cdr (car x)
 
 ; (reduce f (1 2 3) init) is equivalent to (f 1 (f 2 (f 3 init)))
 def reduce lambda (fn list init) (
@@ -59,25 +76,19 @@ def map lambda (fn list) (
 def all lambda list reduce and list true
 
 ; is at least one element non-nil?
-def any lambda list reduce or list ()
+def any lambda list reduce or list nil
 
 ; are all elements nil?
 def none lambda list not (any list)
 
 ; yield a list containing each element i of l
-; such that (f i) is non-nil(cdr fn)
+; such that (f i) is non-nil
 def filter lambda (f l) (
-    if (not l)
-        ()
-    if (f (car l))
-        (cons (car l) (filter f (cdr l)))
-    filter f (cdr l)
+    if l (
+        if (f (car l))
+            (cons (car l) (filter f (cdr l)))
+        filter f (cdr l))
 )
-
-def concat lambda (l r) (
-    if (not l)
-        r
-    cons (car l) (concat (cdr l) r))
 
 ; concatenate the reverse of l with r
 def reverse-concat lambda (l r) (
@@ -86,7 +97,7 @@ def reverse-concat lambda (l r) (
     reverse-concat (cdr l) (cons (car l) r))
 
 ; return l in reverse order
-def reverse lambda l reverse-concat l ()
+def reverse lambda l reverse-concat l nil
 
 def >= lambda (a b) or (equal a b) (asc b a)
 def reversed-range lambda end (
@@ -98,20 +109,21 @@ def range lambda end reverse (reversed-range (dec end))
 
 def repeat lambda (val count) (
     if (asc count 1)
-        ()
-    (cons val (repeat val (dec count))))
+        nil
+    cons val (repeat val (dec count)))
 
-; evaluate arguments and return NIL
-; useful for functions with side-effects
-def void lambda _
-
-def glib dlopen libglib-2.0.so
-def libc dlopen libc.so.6
-
-; Symbols of the form <libpath>.<fnname> are resolved to library functions if possible
-def puts lambda l void ((map libc.putchar l) (libc.putchar 0xa))
 
 def zip lambda (l r) (
     if (and l r) (
         cons (cons (car l) (car r))
              (zip (cdr l) (cdr r))))
+
+def len lambda l (
+    if l (inc (len (cdr l)))
+    0)
+
+
+
+	
+    	
+     

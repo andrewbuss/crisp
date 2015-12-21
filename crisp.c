@@ -2,9 +2,6 @@
 
 // This file contains definitions for the core of crisp
 
-
-
-
 bool debug = false;
 cell global_env = NIL;
 char* stack_base = NULL;
