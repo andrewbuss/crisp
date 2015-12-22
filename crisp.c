@@ -6,21 +6,23 @@ bool debug = false;
 cell global_env = NIL;
 char* stack_base = NULL;
 
-cell allocate_cell() {
-    cell rv = (cell) GC_MALLOC(sizeof(_cell));
-    if (!rv) DIE("Failed to allocate memory for new cell");
+cell malloc_or_die(size_t size) {
+    cell rv = (cell) GC_MALLOC(size);
+    if (!rv) {
+        puts("malloc failed");
+        exit(-1);
+    }
     return rv;
 }
 
 cell make_s64(int64_t x) {
-    cell rv = (cell) GC_MALLOC(sizeof(_cell));
-    if (!rv) DIE("Failed to allocate memory for new cell");
-    *((int64_t*) rv) = x;
+    cell rv = malloc_or_die(8);
+    *(int64_t*) rv = x;
     return rv | S64;
 }
 
 cell make_builtin_function(void* fn, int with_env, int hold_args) {
-    cell c = allocate_cell();
+    cell c = (cell) malloc_or_die(16);
     CELL_DEREF(c).fn = fn;
     CELL_DEREF(c).with_env = with_env;
     CELL_DEREF(c).hold_args = hold_args;
@@ -28,10 +30,24 @@ cell make_builtin_function(void* fn, int with_env, int hold_args) {
 }
 
 cell cons(cell car, cell cdr) {
-    cell c = allocate_cell();
+    cell c = (cell) malloc_or_die(16);
     CELL_DEREF(c).car = car;
     CELL_DEREF(c).cdr = cdr;
     return c | PAIR;
+}
+
+cell lambda(cell args, cell env) {
+    if (!args) return NIL;
+    cell lambda_args = car(args);
+    if (CELL_TYPE(lambda_args) == SYMBOL)
+        lambda_args = LIST1(lambda_args);
+    cell body = cdr(args);
+    DPRINTF("Making lambda %s = %s in %s\n", print_cell(lambda_args), print_cell(body), print_env(env));
+    cell c = (cell) malloc_or_die(24);
+    CELL_DEREF(c).args = lambda_args;
+    CELL_DEREF(c).body = body;
+    CELL_DEREF(c).env = env;
+    return c | LAMBDA;
 }
 
 // Notably this does not strdup the passed symbol
@@ -180,12 +196,9 @@ cell apply(cell args, cell env) {
     DPRINTF("Applying %s to %s\n", print_cell(fn), print_cell(args));
     if (CELL_TYPE(fn) == LAMBDA) {
         // eval (cdr fn) (concat (zip (car fn) args) env)
-        cell lambda_body = cdr(CELL_PTR(fn)->def);
-        cell lambda_args = car(CELL_PTR(fn)->def);
-        cell lambda_env = CELL_PTR(fn)->env;
-        cell new_def = zip(LIST2(lambda_args, args));
-        cell new_env = concat(LIST2(new_def, lambda_env));
-        return eval(lambda_body, new_env);
+        cell new_def = zip(LIST2(CELL_PTR(fn)->args, args));
+        cell new_env = concat(LIST2(new_def, CELL_PTR(fn)->env));
+        return eval(CELL_PTR(fn)->body, new_env);
     }
     else if (CELL_TYPE(fn) == BUILTIN_FUNCTION) {
         if (CELL_DEREF(fn).with_env)
@@ -201,19 +214,6 @@ cell apply(cell args, cell env) {
     return NIL;
 }
 
-
-cell lambda(cell args, cell env) {
-    if (!args) return NIL;
-    cell vars = car(args);
-    if (CELL_TYPE(vars) == SYMBOL)
-        vars = LIST1(vars);
-    cell expr = cdr(args);
-    DPRINTF("Making lambda %s = %s in %s\n", print_cell(vars), print_cell(expr), print_env(env));
-    cell c = allocate_cell();
-    CELL_DEREF(c).def = cons(vars, expr);
-    CELL_DEREF(c).env = env;
-    return c | LAMBDA;
-}
 
 cell quote(cell args) { return args; }
 

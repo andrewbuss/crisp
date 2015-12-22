@@ -113,11 +113,11 @@ static int print(cell c) {
         case FFI_LIBRARY:
             return catf("FFI_LIBRARY<%p>", CELL_DEREF(c).handle);
         case LAMBDA:
-            catf("LAMBDA(");
-            print(caar(c));
-            catf(")<");
-            print(cadr(c));
-            return catf(">");
+            catf("(lambda (");
+            print(CELL_PTR(c)->args);
+            catf(") ");
+            print(CELL_PTR(c)->body);
+            return catf(")");
         case NIL:
             return catf("()");
         default:

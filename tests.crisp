@@ -5,23 +5,7 @@
 ; Whitespace and newlines are ignored
 ; Undefined symbols evaluate to themselves
 
-pass
-
-; () is nil - the only false-y cell;
-; everything else is considered true
-
-
-; if evaluates and returns its second arg if the first is true
-; otherwise it evaluates the remaining args
-if 1 pass fail
-if nil fail pass
-
-; these are also valid
-if 1 pass
-if 1
-
 test 1 1
-
 test '1 1
 test 'a a
 test '(1 . 1) (1 . 1)

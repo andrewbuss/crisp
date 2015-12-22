@@ -43,13 +43,15 @@ enum celltype {
 };
 
 typedef uintptr_t cell;
+
 typedef union _cell {
     struct { // PAIR
         cell car;
         cell cdr;
     };
     struct { // LAMBDA
-        cell def;
+        cell args;
+        cell body;
         cell env;
     };
     struct { // BUILTIN_FUNCTION, FFI_FUNCTION
@@ -71,7 +73,7 @@ typedef union _cell {
 extern bool debug;
 extern cell global_env;
 extern char* stack_base;
-cell allocate_cell();
+cell malloc_or_die(size_t size);
 cell make_s64(int64_t x);
 cell make_builtin_function(void* fn, int with_env, int hold_args);
 cell cons(cell car, cell cdr);

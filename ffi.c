@@ -25,7 +25,7 @@ cell find_ffi_function(char* sym_name, cell env) {
     void* sym = dlsym(CELL_DEREF(lib).handle, dot);
     if (!sym) return NIL;
 
-    cell c = allocate_cell();
+    cell c = malloc_or_die(8);
     CELL_DEREF(c).fn = sym;
     return c | FFI_FUNCTION;
 }
@@ -34,7 +34,7 @@ cell dlopen_fn(cell args) {
     if (!args || CELL_TYPE(car(args)) != SYMBOL) return NIL;
     void* handle = dlopen(SYM_STR(car(args)), RTLD_LAZY);
     if (handle) {
-        cell c = allocate_cell();
+        cell c = malloc_or_die(8);
         CELL_DEREF(c).handle = handle;
         return c | FFI_LIBRARY;
     }
