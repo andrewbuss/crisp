@@ -294,9 +294,11 @@ cell def(cell args, cell env) {
 }
 
 cell with(cell args, cell env) {
-    if (!cdr(args)) return NIL;
+    if(CELL_TYPE(cdr(args)) != PAIR) return NIL;
     cell referent = eval(cdar(args), env);
+    if(CELL_TYPE(cddr(args)) != PAIR) return NIL;
     cell var_name = car(args);
+    if(CELL_TYPE(var_name) != SYMBOL) return NIL;
     DPRINTF("With %s -> %s\n", print_cell(var_name), print_cell(referent));
     return eval(cddr(args), concat(LIST2(LIST1(cons(var_name, referent)), env)));
 }

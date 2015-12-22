@@ -113,7 +113,7 @@ testwith test ((a a) (a a)) (pass: (a a) == (a a))
 
 ; boring recursive example
 defrec factorial x '(
-        if (asc x 1)
+        if (equal x 0)
             1
             (product x (factorial (dec x))))
 
@@ -197,6 +197,9 @@ test '(with x 2 with y 6 sum x y) 8
 ; override builtin functions as needed
 test '(with sum (lambda x product x x) sum 5 5) 25
 test '(sum 5 5) 10
+
+test '(with x y) ()
+test '(with 0 . 300000000000000) ()
 
 (
     with libc (dlopen libc.so.6)
