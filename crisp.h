@@ -12,6 +12,8 @@
 #define CELL_TYPE(x) (((uint64_t)x)&0xffff000000000000)
 #define CELL_PTR(x) ((_cell*)((x)&0xffffffffffff))
 #define CELL_DEREF(x) (*CELL_PTR(x))
+#define SYM_STR(c) ((char*)CELL_PTR(c))
+#define S64_VAL(c) (*((int64_t*)CELL_PTR(c)))
 #define car(c) CELL_PTR(c)->car
 #define cdr(c) CELL_PTR(c)->cdr
 #define caar(c) car(car(c))
@@ -49,12 +51,6 @@ typedef union _cell {
     struct { // LAMBDA
         cell def;
         cell env;
-    };
-    struct { // S64
-        int64_t s64;
-    };
-    struct { // SYMBOL
-        char* symbol;
     };
     struct { // BUILTIN_FUNCTION, FFI_FUNCTION
         union {

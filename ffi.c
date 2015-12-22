@@ -32,7 +32,7 @@ cell find_ffi_function(char* sym_name, cell env) {
 
 cell dlopen_fn(cell args) {
     if (!args || CELL_TYPE(car(args)) != SYMBOL) return NIL;
-    void* handle = dlopen(CELL_DEREF(car(args)).symbol, RTLD_LAZY);
+    void* handle = dlopen(SYM_STR(car(args)), RTLD_LAZY);
     if (handle) {
         cell c = allocate_cell();
         CELL_DEREF(c).handle = handle;
@@ -41,20 +41,20 @@ cell dlopen_fn(cell args) {
     return NIL;
 }
 
-cell apply_ffi_function(cell fn, cell args){
+cell apply_ffi_function(cell fn, cell args) {
     // Hardcode cases for up to 5 args
     void* ffi_args[5];
     int i = 0;
     for (; args && i < 5; args = cdr(args), i++) {
         cell arg = car(args);
         if (CELL_TYPE(arg) == SYMBOL)
-            ffi_args[i] = CELL_DEREF(arg).symbol;
+            ffi_args[i] = SYM_STR(arg);
         else if (CELL_TYPE(arg) == S64)
-            ffi_args[i] = (void*) CELL_DEREF(arg).s64;
+            ffi_args[i] = (void*) S64_VAL(arg);
         else if (CELL_TYPE(arg) == FFI_FUNCTION)
             ffi_args[i] = (void*) CELL_DEREF(arg).fn;
-        else if (CELL_TYPE(arg) == PAIR)
-            ffi_args[i] = NIL;
+        else
+            ffi_args[i] = NULL;
     }
     switch (i) {
         case 0:

@@ -13,9 +13,10 @@ cell allocate_cell() {
 }
 
 cell make_s64(int64_t x) {
-    cell c = allocate_cell();
-    CELL_DEREF(c).s64 = x;
-    return c | S64;
+    cell rv = (cell) GC_MALLOC(sizeof(_cell));
+    if (!rv) DIE("Failed to allocate memory for new cell");
+    *((int64_t*) rv) = x;
+    return rv | S64;
 }
 
 cell make_builtin_function(void* fn, int with_env, int hold_args) {
@@ -35,9 +36,7 @@ cell cons(cell car, cell cdr) {
 
 // Notably this does not strdup the passed symbol
 cell sym(char* symbol) {
-    cell c = allocate_cell();
-    CELL_DEREF(c).symbol = symbol;
-    return c | SYMBOL;
+    return (cell) (symbol) | SYMBOL;
 }
 
 // Builtin functions
@@ -121,10 +120,10 @@ cell equal(cell args) {
     cell right = equal(cdr(args));
     if (!right) return NIL;
     if (CELL_TYPE(left) == SYMBOL && CELL_TYPE(right) == SYMBOL) {
-        if (!strcmp(CELL_DEREF(left).symbol, CELL_DEREF(right).symbol))
+        if (!strcmp(SYM_STR(left), SYM_STR(right)))
             return left;
     }
-    if (CELL_TYPE(left) == S64 && CELL_TYPE(right) == S64 && CELL_DEREF(left).s64 == CELL_DEREF(right).s64)
+    if (CELL_TYPE(left) == S64 && CELL_TYPE(right) == S64 && S64_VAL(left) == S64_VAL(right))
         return left;
     return NIL;
 }
@@ -273,9 +272,9 @@ cell eval(cell c, cell env) {
         //DPRINTF("Looked up %s in %s, found %s\n", print_cell(c), print_cell(env), print_cell(resolved_symbol));
         // x -> 1
         if (resolved_symbol) return cdr(resolved_symbol);
-        char* sym_name = CELL_DEREF(c).symbol;
 #ifndef DISABLE_FFI
-        cell ffi_fn = find_ffi_function(sym_name, env);
+
+        cell ffi_fn = find_ffi_function((char*) CELL_PTR(c), env);
 
         // libc.puts -> FFI_FUNCTION<...>
         if (ffi_fn) return ffi_fn;
@@ -294,11 +293,11 @@ cell def(cell args, cell env) {
 }
 
 cell with(cell args, cell env) {
-    if(CELL_TYPE(cdr(args)) != PAIR) return NIL;
+    if (CELL_TYPE(cdr(args)) != PAIR) return NIL;
     cell referent = eval(cdar(args), env);
-    if(CELL_TYPE(cddr(args)) != PAIR) return NIL;
+    if (CELL_TYPE(cddr(args)) != PAIR) return NIL;
     cell var_name = car(args);
-    if(CELL_TYPE(var_name) != SYMBOL) return NIL;
+    if (CELL_TYPE(var_name) != SYMBOL) return NIL;
     DPRINTF("With %s -> %s\n", print_cell(var_name), print_cell(referent));
     return eval(cddr(args), concat(LIST2(LIST1(cons(var_name, referent)), env)));
 }
@@ -309,7 +308,7 @@ cell hash(cell args) {
 
     // djb2 best hash
     uint64_t hash = 5381;
-    char* s = CELL_PTR(car(args))->symbol;
+    char* s = SYM_STR(car(args));
     while (*s)
         hash = ((hash << 5) + hash) + *(s++);
 

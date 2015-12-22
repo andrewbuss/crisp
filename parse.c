@@ -103,9 +103,9 @@ static int print(cell c) {
                 catf(". ");
             return print(cdr(c));
         case S64:
-            return catf("%ld", CELL_DEREF(c).s64);
+            return catf("%ld", S64_VAL(c));
         case SYMBOL:
-            return catf("%s", CELL_DEREF(c).symbol);
+            return catf("%s", SYM_STR(c));
         case BUILTIN_FUNCTION:
             return catf("BUILTIN_FUNCTION<%p>", CELL_DEREF(c).fn);
         case FFI_FUNCTION:
@@ -135,17 +135,18 @@ char* print_cell(cell c) {
 
 // Handy for pretty-printing local variables in an env
 char* print_env(cell c) {
-    if (!c) return "";
-    if (!strcmp(CELL_PTR(caar(c))->symbol, "GLOBALS")) return "()";
     buf = GC_MALLOC(64);
     buf_len = 64;
     buf_index = 0;
-    catf("(\n");
-    while (c && strcmp(CELL_PTR(caar(c))->symbol, "GLOBALS")) {
-        print(car(c));
+    catf("(");
+    while (IS_PAIR(c)) {
+        if(!IS_PAIR(car(c))) break;
+        if(CELL_TYPE(caar(c)) != SYMBOL) break;
+        if(!strcmp(SYM_STR(caar(c)), "GLOBALS")) break;
         catf("\n");
+        print(car(c));
         c = cdr(c);
     }
-    catf(")\n");
+    catf(")");
     return buf;
 }

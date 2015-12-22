@@ -5,7 +5,7 @@ cell sum(cell args) {
     // sum 1 () 2 -> 1
     // sum -> 0
     if (!args || CELL_TYPE(car(args)) != S64) return make_s64(0);
-    return make_s64(CELL_DEREF(car(args)).s64 + CELL_DEREF(sum(cdr(args))).s64);
+    return make_s64(S64_VAL(car(args)) + S64_VAL(sum(cdr(args))));
 }
 
 cell product(cell args) {
@@ -13,7 +13,7 @@ cell product(cell args) {
     // product 4 () 2 -> 4
     // product -> 1
     if (!args || CELL_TYPE(car(args)) != S64) return make_s64(1);
-    return make_s64(CELL_DEREF(car(args)).s64 * CELL_DEREF(product(cdr(args))).s64);
+    return make_s64(S64_VAL(car(args)) * S64_VAL(product(cdr(args))));
 }
 
 cell modulus(cell args) {
@@ -26,8 +26,8 @@ cell modulus(cell args) {
     cell a = car(args);
     cell b = cdar(args);
     if (!IS_S64(a) || !IS_S64(b)) return NIL;
-    if (CELL_DEREF(b).s64 == 0) return NIL;
-    return make_s64(CELL_DEREF(a).s64 % CELL_DEREF(b).s64);
+    if (S64_VAL(b) == 0) return NIL;
+    return make_s64(S64_VAL(a) % S64_VAL(b));
 }
 
 // Returns the first arg if args are strictly ascending
@@ -42,6 +42,6 @@ cell asc(cell args) {
     if (!IS_PAIR(cdr(args))) return NIL;
     cell next = asc(cdr(args));
     if (!next) return NIL;
-    if (CELL_DEREF(car(args)).s64 < CELL_DEREF(next).s64) return car(args);
+    if (S64_VAL(car(args)) < S64_VAL(next)) return car(args);
     return NIL;
 }
