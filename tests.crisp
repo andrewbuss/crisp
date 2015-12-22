@@ -151,12 +151,13 @@ test '(filter sum nil) nil
 test '(filter (lambda x x) (a b c)) (a b c)
 
 test '(concat (a b c d) (x y z)) (a b c d x y z)
-test '(concat nil (x y z)) (x y z)
-test '(concat (a b c d) nil) (a b c d)
+test '(concat nil (x y z)) (nil x y z)
+test '(concat (a b c d) nil) (a b c d ())
 test '(concat a (b c d)) (a b c d)
 test '(concat (a b c) d) (a b c d)
-test '(concat (a b c) d () (e f g) h ) (a b c d e f g h)
-test '(concat nil nil) nil
+test '(concat (a b c) d () (e f g) h ) (a b c d () e f g h)
+test '(concat nil nil) '(() ())
+test '(concat (a . b) 3 ( c d . e)) (a b 3 c d e)
 
 test '(reverse nil) nil
 test '(reverse (a b c)) (c b a)

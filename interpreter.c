@@ -8,35 +8,35 @@ int main(int argc, char** argv) {
         debug = true;
 
     //                                                         with_env, hold_args
-    global_env = cons(cons(sym("if"), make_builtin_function(if_fn, true, true)), NIL);
-    global_env = cons(cons(sym("eval"), make_builtin_function(eval, true, false)), global_env);
-    global_env = cons(cons(sym("quote"), make_builtin_function(quote, false, true)), global_env);
-    global_env = cons(cons(sym("lambda"), make_builtin_function(lambda, true, true)), global_env);
-    global_env = cons(cons(sym("apply"), make_builtin_function(apply, true, false)), global_env);
-    global_env = cons(cons(sym("car"), make_builtin_function(car_fn, false, false)), global_env);
-    global_env = cons(cons(sym("cdr"), make_builtin_function(cdr_fn, false, false)), global_env);
-    global_env = cons(cons(sym("cons"), make_builtin_function(cons_fn, false, false)), global_env);
-    global_env = cons(cons(sym("sum"), make_builtin_function(sum, false, false)), global_env);
-    global_env = cons(cons(sym("product"), make_builtin_function(product, false, false)), global_env);
-    global_env = cons(cons(sym("modulus"), make_builtin_function(modulus, false, false)), global_env);
-    global_env = cons(cons(sym("list"), make_builtin_function(quote, false, false)), global_env);
-    global_env = cons(cons(sym("concat"), make_builtin_function(concat, false, false)), global_env);
-    global_env = cons(cons(sym("equal"), make_builtin_function(equal, false, false)), global_env);
-    global_env = cons(cons(sym("ispair"), make_builtin_function(ispair, false, false)), global_env);
-    global_env = cons(cons(sym("same"), make_builtin_function(same, false, false)), global_env);
-    global_env = cons(cons(sym("def"), make_builtin_function(def, true, true)), global_env);
-    global_env = cons(cons(sym("with"), make_builtin_function(with, true, true)), global_env);
-    global_env = cons(cons(sym("asc"), make_builtin_function(asc, false, false)), global_env);
-    global_env = cons(cons(sym("hash"), make_builtin_function(hash, false, false)), global_env);
+    global_env = cons(cons(sym("if"), make_native_function(if_fn, true, true)), NIL);
+    global_env = cons(cons(sym("eval"), make_native_function(eval, true, false)), global_env);
+    global_env = cons(cons(sym("quote"), make_native_function(quote, false, true)), global_env);
+    global_env = cons(cons(sym("lambda"), make_native_function(lambda, true, true)), global_env);
+    global_env = cons(cons(sym("apply"), make_native_function(apply_fn, true, false)), global_env);
+    global_env = cons(cons(sym("car"), make_native_function(car_fn, false, false)), global_env);
+    global_env = cons(cons(sym("cdr"), make_native_function(cdr_fn, false, false)), global_env);
+    global_env = cons(cons(sym("cons"), make_native_function(cons_fn, false, false)), global_env);
+    global_env = cons(cons(sym("sum"), make_native_function(sum, false, false)), global_env);
+    global_env = cons(cons(sym("product"), make_native_function(product, false, false)), global_env);
+    global_env = cons(cons(sym("modulus"), make_native_function(modulus, false, false)), global_env);
+    global_env = cons(cons(sym("list"), make_native_function(quote, false, false)), global_env);
+    global_env = cons(cons(sym("concat"), make_native_function(concat_fn, false, false)), global_env);
+    global_env = cons(cons(sym("equal"), make_native_function(equal_fn, false, false)), global_env);
+    global_env = cons(cons(sym("ispair"), make_native_function(ispair, false, false)), global_env);
+    global_env = cons(cons(sym("same"), make_native_function(same, false, false)), global_env);
+    global_env = cons(cons(sym("def"), make_native_function(def, true, true)), global_env);
+    global_env = cons(cons(sym("with"), make_native_function(with, true, true)), global_env);
+    global_env = cons(cons(sym("asc"), make_native_function(asc, false, false)), global_env);
+    global_env = cons(cons(sym("hash"), make_native_function(hash, false, false)), global_env);
 
 #ifndef DISABLE_FFI
-    global_env = cons(cons(sym("dlopen"), make_builtin_function(dlopen_fn, false, false)), global_env);
+    global_env = cons(cons(sym("dlopen"), make_native_function(dlopen_fn, false, false)), global_env);
 #endif
 
     global_env = cons(cons(sym("GLOBALS"), NIL), global_env);
 
     // The global env looks like this:
-    //     (y . 5) (z . 5) ..       (GLOBALS) (foo . 5) (identity . LAMBDA(x)<x>) .. (hash . BUILTIN_FUNCTION<...>) (asc . BUILTIN_FUNCTION<...>) ...
+    //     (y . 5) (z . 5) ..       (GLOBALS) (foo . 5) (identity . LAMBDA(x)<x>) .. (hash . NATIVE_FUNCTION<...>) (asc . NATIVE_FUNCTION<...>) ...
     // local variables-^  just a marker-^       ^-global var  ^-builtins
 
     // Lookups proceed left to right so local variables occlude global variables,

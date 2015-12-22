@@ -21,12 +21,12 @@ cell make_s64(int64_t x) {
     return rv | S64;
 }
 
-cell make_builtin_function(void* fn, int with_env, int hold_args) {
+cell make_native_function(void* fn, int with_env, int hold_args) {
     cell c = (cell) malloc_or_die(16);
     CELL_DEREF(c).fn = fn;
     CELL_DEREF(c).with_env = with_env;
     CELL_DEREF(c).hold_args = hold_args;
-    return c | BUILTIN_FUNCTION;
+    return c | NATIVE_FUNCTION;
 }
 
 cell cons(cell car, cell cdr) {
@@ -65,31 +65,31 @@ cell sym(char* symbol) {
 // interpreter must create the wrapping cell for these
 // functions using hold_args = true.
 
-cell car_fn(cell args) {
+cell car_fn(cell args, cell env) {
     // car 4 ->
     // car (a b) -> a
-    if (!args || CELL_TYPE(car(args)) != PAIR) return NIL;
+    if (!args || !IS_PAIR(car(args))) return NIL;
     return caar(args);
 }
 
-cell cdr_fn(cell args) {
+cell cdr_fn(cell args, cell env) {
     // cdr 4 ->
     // cdr (a b) -> b
-    if (!args || CELL_TYPE(car(args)) != PAIR) return NIL;
+    if (!args || !IS_PAIR(car(args))) return NIL;
     return cadr(args);
 }
 
-cell cons_fn(cell args) {
+cell cons_fn(cell args, cell env) {
     // cons 4 -> 4
     // cons 4 5 -> 4 . 5
     // cons a . b ->
     if (!args) return NIL;
     if (!cdr(args)) return args;
-    if (CELL_TYPE(cdr(args)) != PAIR) return NIL;
+    if (!IS_PAIR(cdr(args))) return NIL;
     return cons(car(args), cdar(args));
 }
 
-cell ispair(cell args) {
+cell ispair(cell args, cell env) {
     // ispair 4 ->
     // ispair () -> ()
     // ispair (a b) -> (a b)
@@ -100,7 +100,7 @@ cell ispair(cell args) {
 // Check for pointer equality among args
 // If one argument is not equal, returns NIL
 // Otherwise returns the first argument
-cell same(cell args) {
+cell same(cell args, cell env) {
     // same ->
     // same 2 -> 2
 
@@ -112,14 +112,24 @@ cell same(cell args) {
     if (!args) return NIL;
     cell first = car(args);
     cell rest = cdr(args);
-    if (!rest || (ispair(rest) && (first == same(rest)))) return first;
+    if (!rest || (ispair(rest, NIL) && (first == same(rest, NIL)))) return first;
+    return NIL;
+}
+
+cell equal(cell left, cell right) {
+    if (CELL_TYPE(left) == SYMBOL && CELL_TYPE(right) == SYMBOL) {
+        if (!strcmp(SYM_STR(left), SYM_STR(right)))
+            return left;
+    }
+    if (IS_S64(left) && IS_S64(right) && S64_VAL(left) == S64_VAL(right))
+        return left;
     return NIL;
 }
 
 // Check for value equality among args, or equality of symbols
 // If one argument is not equal, returns NIL
 // Otherwise returns the first argument
-cell equal(cell args) {
+cell equal_fn(cell args, cell env) {
     // equal ->
     // equal 1 -> 1
     // equal 2 1 ->
@@ -133,39 +143,36 @@ cell equal(cell args) {
     cell left = car(args);
     if (!cdr(args)) return left;
     if (!IS_PAIR(cdr(args))) return NIL;
-    cell right = equal(cdr(args));
+    cell right = equal_fn(cdr(args), NIL);
     if (!right) return NIL;
-    if (CELL_TYPE(left) == SYMBOL && CELL_TYPE(right) == SYMBOL) {
-        if (!strcmp(SYM_STR(left), SYM_STR(right)))
-            return left;
-    }
-    if (CELL_TYPE(left) == S64 && CELL_TYPE(right) == S64 && S64_VAL(left) == S64_VAL(right))
-        return left;
+    if (equal(left, right)) return left;
     return NIL;
 }
 
+cell concat(cell first, cell rest) {
+    if (!first) return rest;
+    if (IS_PAIR(first))
+        return cons(car(first), concat(cdr(first), rest));
+    else
+        return cons(first, rest);
+}
+
 // Concatenate arguments
-cell concat(cell args) {
+cell concat_fn(cell args, cell env) {
     // concat (a b) c (d e) -> a b c d e
     // concat ((a b) (c d)) e -> (a b) (c d) e
     // concat a -> a
     // concat a . b -> a b
     if (!args) return NIL;
+    if (!IS_PAIR(args)) return LIST1(args);
     cell first = car(args);
-    cell rest = cdr(args);
-    if (!rest) {
-        if (!first || IS_PAIR(first)) return first;
-        else return LIST1(first);
-    }
-    if (!IS_PAIR(rest)) rest = LIST1(rest);
-    if (!first) return concat(rest);
     if (!IS_PAIR(first)) first = LIST1(first);
-    return cons(car(first), concat(cons(cdr(first), rest)));
+    return concat(first, concat_fn(cdr(args), NIL));
 }
 
 // Pair up items from a left and right list into a
 // new list of cons pairs until one list runs out
-cell zip(cell args) {
+cell zip_fn(cell args, cell env) {
     // zip (a b c) (d e) -> (a . d) (b . e)
     // zip () () ->
     // zip ->
@@ -173,38 +180,46 @@ cell zip(cell args) {
     // zip (a b) (c . d) -> (a . c)
     if (!args || !IS_PAIR(cdr(args))) return NIL;
     cell a = car(args), b = cdar(args);
-    if (!IS_PAIR(a) || !IS_PAIR(b)) return NIL;
-    cell rv = cons(cons(car(a), car(b)), zip(LIST2(cdr(a), cdr(b))));
-    return rv;
+    return zip(a, b);
 }
 
-cell assoc(cell args) {
+cell zip(cell a, cell b) {
+    if (!IS_PAIR(a) || !IS_PAIR(b)) return NIL;
+    return cons(cons(car(a), car(b)), zip(cdr(a), cdr(b)));
+}
+
+cell assoc(cell key, cell dict) {
+    if (!IS_PAIR(dict) || !IS_PAIR(car(dict))) return NIL;
+    if (equal(key, caar(dict))) return car(dict);
+    return assoc(key, cdr(dict));
+}
+
+cell assoc_fn(cell args, cell env) {
     if (!args || !IS_PAIR(cdr(args))) return NIL;
     cell key = car(args), dict = cdar(args);
-    if (!IS_PAIR(dict) || !IS_PAIR(car(dict))) return NIL;
-    if (equal(LIST2(key, caar(dict)))) return car(dict);
-    return assoc(LIST2(key, cdr(dict)));
+    return assoc(key, dict);
 }
 
-cell apply(cell args, cell env) {
+cell apply_fn(cell args, cell env) {
     if (!args) return NIL;
     cell fn = car(args);
     if (!IS_CALLABLE(fn)) return NIL;
     if (!IS_PAIR(cdr(args))) args = NIL;
     else args = cdar(args);
+    return apply(fn, args, env);
+}
+
+cell apply(cell fn, cell args, cell env) {
     if (!IS_PAIR(args)) args = LIST1(args);
     DPRINTF("Applying %s to %s\n", print_cell(fn), print_cell(args));
     if (CELL_TYPE(fn) == LAMBDA) {
         // eval (cdr fn) (concat (zip (car fn) args) env)
-        cell new_def = zip(LIST2(CELL_PTR(fn)->args, args));
-        cell new_env = concat(LIST2(new_def, CELL_PTR(fn)->env));
+        cell new_def = zip(CELL_PTR(fn)->args, args);
+        cell new_env = concat(new_def, CELL_PTR(fn)->env);
         return eval(CELL_PTR(fn)->body, new_env);
     }
-    else if (CELL_TYPE(fn) == BUILTIN_FUNCTION) {
-        if (CELL_DEREF(fn).with_env)
-            return CELL_DEREF(fn).fn(args, env);
-        else
-            return CELL_DEREF(fn).fn(args);
+    else if (CELL_TYPE(fn) == NATIVE_FUNCTION) {
+        return CELL_DEREF(fn).fn(args, env);
     }
 #ifndef DISABLE_FFI
     else if (CELL_TYPE(fn) == FFI_FUNCTION) {
@@ -215,7 +230,7 @@ cell apply(cell args, cell env) {
 }
 
 
-cell quote(cell args) { return args; }
+cell quote(cell args, cell env) { return args; }
 
 cell if_fn(cell args, cell env) {
     if (!args) return NIL;
@@ -259,16 +274,16 @@ cell eval(cell c, cell env) {
         // x . y -> 1 . 2
         if (!IS_PAIR(rest)) return cons(first, eval(rest, env));
         if (IS_CALLABLE(first)) {
-            if (CELL_TYPE(first) != BUILTIN_FUNCTION || !CELL_DEREF(first).hold_args)
+            if (CELL_TYPE(first) != NATIVE_FUNCTION || !CELL_DEREF(first).hold_args)
                 rest = evalmap(rest, env);
             // apply f to args
-            return apply(LIST2(first, rest), env);
+            return apply(first, rest, env);
         }
         // x y -> 1 2
         return cons(first, evalmap(rest, env));
     }
     else if (CELL_TYPE(c) == SYMBOL) {
-        cell resolved_symbol = assoc(LIST2(c, env));
+        cell resolved_symbol = assoc(c, env);
         //DPRINTF("Looked up %s in %s, found %s\n", print_cell(c), print_cell(env), print_cell(resolved_symbol));
         // x -> 1
         if (resolved_symbol) return cdr(resolved_symbol);
@@ -293,16 +308,16 @@ cell def(cell args, cell env) {
 }
 
 cell with(cell args, cell env) {
-    if (CELL_TYPE(cdr(args)) != PAIR) return NIL;
+    if (!IS_PAIR(cdr(args))) return NIL;
     cell referent = eval(cdar(args), env);
-    if (CELL_TYPE(cddr(args)) != PAIR) return NIL;
+    if (!IS_PAIR(cddr(args))) return NIL;
     cell var_name = car(args);
     if (CELL_TYPE(var_name) != SYMBOL) return NIL;
     DPRINTF("With %s -> %s\n", print_cell(var_name), print_cell(referent));
-    return eval(cddr(args), concat(LIST2(LIST1(cons(var_name, referent)), env)));
+    return eval(cddr(args), cons(cons(var_name, referent), env));
 }
 
-cell hash(cell args) {
+cell hash(cell args, cell env) {
     if (!args) return make_s64(0);
     if (CELL_TYPE(car(args)) != SYMBOL) return make_s64((uint64_t) car(args));
 

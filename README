@@ -2,7 +2,7 @@ crisp: a C lisp
 
 Repo contents:
 
-    crisp.h       : header file with all builtin definitions
+    crisp.h       : header file with all native definitions
     crisp.c       : the core, including cell allocation and evaluation
     parse.c       : routines for converting between cells and strings
     math.c        : routines for numbers

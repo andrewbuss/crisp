@@ -1,22 +1,22 @@
 #include "crisp.h"
 
-cell sum(cell args) {
+cell sum(cell args, cell env) {
     // sum 1 2 -> 3
     // sum 1 () 2 -> 1
     // sum -> 0
     if (!args || CELL_TYPE(car(args)) != S64) return make_s64(0);
-    return make_s64(S64_VAL(car(args)) + S64_VAL(sum(cdr(args))));
+    return make_s64(S64_VAL(car(args)) + S64_VAL(sum(cdr(args), NIL)));
 }
 
-cell product(cell args) {
+cell product(cell args, cell env) {
     // product 2 3 -> 6
     // product 4 () 2 -> 4
     // product -> 1
     if (!args || CELL_TYPE(car(args)) != S64) return make_s64(1);
-    return make_s64(S64_VAL(car(args)) * S64_VAL(product(cdr(args))));
+    return make_s64(S64_VAL(car(args)) * S64_VAL(product(cdr(args), NIL)));
 }
 
-cell modulus(cell args) {
+cell modulus(cell args, cell env) {
     // modulus 7 3 -> 1
     // modulus 7 0 ->
     // modulus () 2 ->
@@ -31,7 +31,7 @@ cell modulus(cell args) {
 }
 
 // Returns the first arg if args are strictly ascending
-cell asc(cell args) {
+cell asc(cell args, cell env) {
     // asc ->
     // asc 1 -> 1
     // asc 4 2 ->
@@ -40,7 +40,7 @@ cell asc(cell args) {
     if (!args || !IS_S64(car(args))) return NIL;
     if (!cdr(args)) return car(args);
     if (!IS_PAIR(cdr(args))) return NIL;
-    cell next = asc(cdr(args));
+    cell next = asc(cdr(args), NIL);
     if (!next) return NIL;
     if (S64_VAL(car(args)) < S64_VAL(next)) return car(args);
     return NIL;

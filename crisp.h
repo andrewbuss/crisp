@@ -24,7 +24,7 @@
 #define cdddr(c) cdr(cdr(cdr(c)))
 #define LIST1(a) cons((a), NIL)
 #define LIST2(a, b) cons((a), cons((b), NIL))
-#define IS_CALLABLE(c) (CELL_TYPE(c) == LAMBDA || CELL_TYPE(c) == FFI_FUNCTION || CELL_TYPE(c) == BUILTIN_FUNCTION)
+#define IS_CALLABLE(c) (CELL_TYPE(c) == LAMBDA || CELL_TYPE(c) == FFI_FUNCTION || CELL_TYPE(c) == NATIVE_FUNCTION)
 #define IS_S64(c) (CELL_TYPE(c) == S64)
 #define IS_PAIR(c) (CELL_TYPE(c) == PAIR)
 
@@ -37,7 +37,7 @@ enum celltype {
     SYMBOL = 0x2000000000000,
     S64 = 0x3000000000000,
     LAMBDA = 0x4000000000000,
-    BUILTIN_FUNCTION = 0x5000000000000,
+    NATIVE_FUNCTION = 0x5000000000000,
     FFI_FUNCTION = 0x6000000000000,
     FFI_LIBRARY = 0x7000000000000
 };
@@ -54,7 +54,7 @@ typedef union _cell {
         cell body;
         cell env;
     };
-    struct { // BUILTIN_FUNCTION, FFI_FUNCTION
+    struct { // NATIVE_FUNCTION, FFI_FUNCTION
         union {
             cell(* fn)();
         };
@@ -75,35 +75,34 @@ extern cell global_env;
 extern char* stack_base;
 cell malloc_or_die(size_t size);
 cell make_s64(int64_t x);
-cell make_builtin_function(void* fn, int with_env, int hold_args);
+cell make_native_function(void* fn, int with_env, int hold_args);
 cell cons(cell car, cell cdr);
 cell sym(char* symbol);
-cell car_fn(cell args);
-cell cdr_fn(cell args);
-cell cons_fn(cell args);
-cell ispair(cell args);
-cell same(cell args);
-cell sum(cell args);
-cell product(cell args);
-cell modulus(cell args);
-cell equal(cell args);
-cell asc(cell args);
-cell assoc(cell);
-cell assoc(cell args);
+cell car_fn(cell args, cell env);
+cell cdr_fn(cell args, cell env);
+cell cons_fn(cell args, cell env);
+cell ispair(cell args, cell env);
+cell same(cell args, cell env);
+cell sum(cell args, cell env);
+cell product(cell args, cell env);
+cell modulus(cell args, cell env);
+cell equal_fn(cell args, cell env);
+cell asc(cell args, cell env);
+cell assoc(cell args, cell env);
 cell find_ffi_function(char* sym_name, cell env);
-cell dlopen_fn(cell args);
-cell concat(cell args);
-cell zip(cell args);
+cell dlopen_fn(cell args, cell env);
+cell concat_fn(cell args, cell env);
+cell zip(cell args, cell env);
 cell eval(cell c, cell env);
-cell eval(cell c, cell env);
-cell apply(cell args, cell env);
+cell apply(cell fn, cell args, cell env);
+cell apply_fn(cell args, cell env);
 cell lambda(cell args, cell env);
-cell quote(cell args);
+cell quote(cell args, cell env);
 cell if_fn(cell args, cell env);
 cell evalmap(cell args, cell env);
 cell def(cell args, cell env);
 cell with(cell args, cell env);
-cell hash(cell args);
+cell hash(cell args, cell env);
 int main(int argc, char** argv);
 cell parse(char** s);
 char* print_cell(cell c);

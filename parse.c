@@ -106,8 +106,8 @@ static int print(cell c) {
             return catf("%ld", S64_VAL(c));
         case SYMBOL:
             return catf("%s", SYM_STR(c));
-        case BUILTIN_FUNCTION:
-            return catf("BUILTIN_FUNCTION<%p>", CELL_DEREF(c).fn);
+        case NATIVE_FUNCTION:
+            return catf("NATIVE_FUNCTION<%p>", CELL_DEREF(c).fn);
         case FFI_FUNCTION:
             return catf("FFI_FUNCTION<%p>", CELL_DEREF(c).fn);
         case FFI_LIBRARY:

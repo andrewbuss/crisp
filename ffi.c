@@ -15,7 +15,7 @@ cell find_ffi_function(char* sym_name, cell env) {
     size_t libname_len = dot - sym_name - 1;
     char* libname = strncpy(malloc(libname_len + 1), sym_name, libname_len);
     libname[libname_len] = 0;
-    cell lib = assoc(LIST2(sym(libname), env));
+    cell lib = assoc(sym(libname), env);
     if (!lib) return NIL;
 
     lib = cdr(lib);
@@ -30,7 +30,7 @@ cell find_ffi_function(char* sym_name, cell env) {
     return c | FFI_FUNCTION;
 }
 
-cell dlopen_fn(cell args) {
+cell dlopen_fn(cell args, cell env) {
     if (!args || CELL_TYPE(car(args)) != SYMBOL) return NIL;
     void* handle = dlopen(SYM_STR(car(args)), RTLD_LAZY);
     if (handle) {
