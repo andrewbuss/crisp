@@ -85,6 +85,7 @@ test '(asc 3 2 1) nil
 
 ; sum: return the sum of its arguments
 test '(sum 1 2 3 4) 10
+test '(sum 0 . AAAAAA) 0
 
 ; product: return the product of its arguments
 test '(product 1 2 3 4) 24
@@ -185,6 +186,7 @@ test '(sum 5 5) 10
 
 test '(with x y) ()
 test '(with 0 . 300000000000000) ()
+
 
 (
     with libc (dlopen libc.so.6)
