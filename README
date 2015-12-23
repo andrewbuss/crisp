@@ -81,9 +81,9 @@ Evaluation notes:
     function is applied. If the head is not callable, each element of the list
     is independently evaluated and the resulting list is returned.
 
-    The behavior of C functions is unconstrained, although the interface is
-    defined: a C function accepts a cell which may be either NIL or a PAIR,
-    and returns a cell which may be of any type.
+    The behavior of native functions is unconstrained, although the interface
+    is defined: a native function accepts a cell which may be either NIL or a
+    PAIR, and returns a cell which may be of any type.
 
     Little is specified about the behavior of FFI functions - the interface
     is not stable enough to describe yet. Roughly, an FFI_FUNCTION can be
@@ -98,18 +98,18 @@ Evaluation notes:
     corresponding values to which the lambda is being applied. This new
     environment is stacked atop the environment in which the lambda was
     created, so variables may override other local variables, but global
-    definitions are still accessible
+    definitions are still accessible.
 
     For example, to evaluate
 
-        with z 4 (def lambda (x y) sum y (product z x))
+        with z 4 (def f lambda (x y) sum y (product z x))
 
         f 3 7
 
     the interpreter first pairs x with 3 and y with 7 to yield a new env
     concatenated with the existing environment:
 
-        (x . 3) (y . 7) (z . 4) ... [ other globals ] .. [ builtins ]
+        (x . 3) (y . 7) (z . 4) ... (f . (lambda (x y) sum y (product z x)))
 
     Then it evaluates the body of the lambda in this environment, obtaining:
 
@@ -123,13 +123,15 @@ Evaluation notes:
 
 Implementation notes:
 
-    For simplicity we avoid C "fast-paths", preferring instead to use lispish
-    primitives, even in C. For example, the C assoc implementation is recursive
-    even though it could be implemented iteratively instead to improve
-    performance. Other functions are most simply expressed recursively.
+    For simplicity we avoid iterative "fast-paths", preferring instead to use
+    lispish primitives, even in C. For example, the C assoc implementation is
+    recursive even though it could be implemented iteratively instead, likely
+    yielding better performance.
 
     There is no special "environment" struct. The environment is a normal list
     containing dotted-pair mappings between variable names and their values.
+    Evaluation contexts are stacked by concatenating a list of name/value pairs
+    to the previous environment.
 
     The intention is to implement only the minimum functionality in C required
     to implement higher-level functionality in the crisp language, such as map,
@@ -140,9 +142,13 @@ Implementation notes:
     system is a goal of later work.
 
     The FFI functionality is exciting because it allows reuse of libraries from
-    many other projects with very little extra C code in crisp, Between glib
-    and libc, crisp in theory has a decently sized general purpose library.
-    libsdl2 is another exciting option.
+    many other projects with very little extra C code in crisp. Using libc from
+    crisp allows all sorts of low-level I/O. 
+
+    When a symbol is parsed, we search for it in a global list of symbols. If
+    it exists, we return the existing symbol; otherwise it is added to the
+    list. This way, we can quickly comparse symbols by their addresses without
+    a call to strcmp.
 
 Fuzzing:
 

@@ -1,13 +1,11 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(crisp)
+project(crisp LANGUAGES C)
 find_package(Threads)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_definitions(-DPOINTER_MASK=0x0000FFFFFFFFFFFF)
 add_subdirectory(bdwgc EXCLUDE_FROM_ALL)
-
-set(CMAKE_BUILD_TYPE Release)
 
 add_executable(crisp_noffi EXCLUDE_FROM_ALL crisp.c interpreter.c parse.c math.c)
 target_compile_definitions(crisp_noffi PRIVATE DISABLE_FFI)
