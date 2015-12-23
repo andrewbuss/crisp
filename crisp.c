@@ -5,6 +5,7 @@
 bool debug = false;
 cell global_env = NIL;
 char* stack_base = NULL;
+cell sym_list = NIL;
 
 cell malloc_or_die(size_t size) {
     cell rv = (cell) GC_MALLOC(size);
@@ -50,9 +51,19 @@ cell lambda(cell args, cell env) {
     return c | LAMBDA;
 }
 
-// Notably this does not strdup the passed symbol
+// Look up symbol in list
+cell sym_dedupe(cell list, char* symbol) {
+    if (!IS_PAIR(list)) return NIL;
+    if (!strcmp(SYM_STR(car(list)), symbol)) return car(list);
+    return sym_dedupe(cdr(list), symbol);
+}
+
+
 cell sym(char* symbol) {
-    return (cell) (symbol) | SYMBOL;
+    cell deduped = sym_dedupe(sym_list, symbol);
+    if(deduped) return deduped;
+    sym_list = cons((cell)strdup(symbol) | SYMBOL, sym_list);
+    return car(sym_list);
 }
 
 // Builtin functions
@@ -116,10 +127,9 @@ cell same(cell args, cell env) {
     return NIL;
 }
 
-cell equal(cell left, cell right) {
-    if (CELL_TYPE(left) == SYMBOL && CELL_TYPE(right) == SYMBOL) {
-        if (!strcmp(SYM_STR(left), SYM_STR(right)))
-            return left;
+static inline cell equal(cell left, cell right) {
+    if (left == right) {
+        return left;
     }
     if (IS_S64(left) && IS_S64(right) && S64_VAL(left) == S64_VAL(right))
         return left;
@@ -213,7 +223,6 @@ cell apply(cell fn, cell args, cell env) {
     if (!IS_PAIR(args)) args = LIST1(args);
     DPRINTF("Applying %s to %s\n", print_cell(fn), print_cell(args));
     if (CELL_TYPE(fn) == LAMBDA) {
-        // eval (cdr fn) (concat (zip (car fn) args) env)
         cell new_def = zip(CELL_PTR(fn)->args, args);
         cell new_env = concat(new_def, CELL_PTR(fn)->env);
         return eval(CELL_PTR(fn)->body, new_env);
@@ -262,7 +271,10 @@ cell evalmap(cell args, cell env) {
 cell eval(cell c, cell env) {
     // Hack to limit recursion depth
     // It is otherwise trivial to crash the interpeter with infinite recursion
-    if (stack_base - (char*) (&c) > 0x40000) DIE("Stack overflowed");
+    if (stack_base - (char*) (&c) > 0x40000) {
+        puts("Stack overflowed");
+        exit(-1);
+    }
     if IS_PAIR(c) {
         DPRINTF("Evalling %s in %s\n", print_cell(c), print_env(env));
         // () x y -> () 1 2
@@ -287,8 +299,8 @@ cell eval(cell c, cell env) {
         //DPRINTF("Looked up %s in %s, found %s\n", print_cell(c), print_cell(env), print_cell(resolved_symbol));
         // x -> 1
         if (resolved_symbol) return cdr(resolved_symbol);
-#ifndef DISABLE_FFI
 
+#ifndef DISABLE_FFI
         cell ffi_fn = find_ffi_function((char*) CELL_PTR(c), env);
 
         // libc.puts -> FFI_FUNCTION<...>

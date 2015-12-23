@@ -68,8 +68,7 @@ cell apply_ffi_function(cell fn, cell args) {
         case 4:
             return make_s64(CELL_DEREF(fn).fn(ffi_args[0], ffi_args[1], ffi_args[2], ffi_args[3]));
         case 5:
-            return make_s64(CELL_DEREF(fn).fn(ffi_args[0], ffi_args[1], ffi_args[2], ffi_args[3], ffi_args[4]));
         default:
-            DIE("Couldn't apply FFI function to more than 5 arguments")
+            return make_s64(CELL_DEREF(fn).fn(ffi_args[0], ffi_args[1], ffi_args[2], ffi_args[3], ffi_args[4]));
     }
 }

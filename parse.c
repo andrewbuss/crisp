@@ -48,7 +48,7 @@ cell parse(char** s) {
             while (*i && !isspace(*i) && *i != '(' && *i != ')') i++;
             size_t token_len = i - *s;
 
-            char* token = strncpy(GC_MALLOC_ATOMIC(token_len + 1), *s, token_len);
+            char* token = strncpy(malloc(token_len + 1), *s, token_len);
             token[token_len] = '\0';
             *s = i;
             cell c;
@@ -58,7 +58,7 @@ cell parse(char** s) {
             long val = strtol(token, &endptr, 0);
             if (endptr != token) c = make_s64(val);
             else c = sym(token);
-
+            free(token);
             return cons(c, parse(s));
         }
     }

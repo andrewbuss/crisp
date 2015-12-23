@@ -28,7 +28,6 @@
 #define IS_S64(c) (CELL_TYPE(c) == S64)
 #define IS_PAIR(c) (CELL_TYPE(c) == PAIR)
 
-#define DIE(s) do{ puts(s); exit(-1); } while(0);
 #define DPRINTF(fmt, ...) do { if (debug) fprintf(stderr, fmt, __VA_ARGS__); } while (0)
 
 enum celltype {

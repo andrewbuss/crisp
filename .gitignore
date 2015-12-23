@@ -4,11 +4,10 @@ crisp
 *.cmake
 CMakeFiles
 CMakeCache.txt
-crisp_noffi
-crisp_fuzz_parser
-crisp_fuzz
-build
-build_fuzz
+release/
+debug/
+profile/
+fuzzing/
 install_manifest.txt
 fuzz
 peda-session-*
