@@ -1,3 +1,5 @@
+import std
+
 ; https://en.wikipedia.org/wiki/Tak_(function)
 
 defrec tak (x y z) '(

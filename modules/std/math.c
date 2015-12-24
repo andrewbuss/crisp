@@ -1,4 +1,4 @@
-#include "crisp.h"
+#include <crisp.h>
 
 cell sum(cell args, cell env) {
     // sum 1 2 -> 3

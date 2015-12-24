@@ -1,3 +1,14 @@
+def assoc native-function this.assoc_fn
+def apply native-function this.apply_fn
+def concat native-function this.concat_fn
+def asc native-function this.asc
+def sum native-function this.sum
+def product native-function this.product
+def modulus native-function this.modulus
+def hash native-function this.hash
+def zip native-function this.zip_fn
+def ispair native-function this.ispair
+
 def nil
 
 ; the opposite of nil is true
@@ -15,12 +26,11 @@ def neq lambda (a b) not (equal a b)
 def dec lambda x (sum x -1)
 def inc lambda x (sum x 1)
 def neg lambda x (product x -1)
-def difference lambda (a b) (sum a (neg b))
+def sub lambda (a b) (sum a (neg b))
 
 ; evaluate arguments and return NIL
 ; useful for functions with side-effects
 def void lambda _
-
 
 ; the Y combinator
 def makerec lambda f (
@@ -31,7 +41,6 @@ def defrec lambda (name args body) (
     with inner (eval lambda args body)
     with outer (eval lambda name inner)
     eval def name makerec outer)
-
 
 void (
     with list-equal (lambda (a b)
@@ -123,9 +132,3 @@ def zip lambda (l r) (
 def len lambda l (
     if l (inc (len (cdr l)))
     0)
-
-
-
-	
-    	
-     

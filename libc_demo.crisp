@@ -1,3 +1,5 @@
+import std
+
 def libc dlopen libc.so.6
 
 ; The void function discards its argument so crisp

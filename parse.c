@@ -89,39 +89,42 @@ inline static int catf(char* fmt, ...) {
 // during its traversal of c
 static int print(cell c) {
     switch (CELL_TYPE(c)) {
-        case PAIR:
-            if (CELL_TYPE(car(c)) == PAIR) {
-                catf("(");
-                print(car(c));
-                catf(")");
-            }
-            else print(car(c));
-            if (!cdr(c)) return 0;
+    case PAIR:
+      if (CELL_TYPE(car(c)) == PAIR) {
+        catf("(");
+        print(car(c));
+        catf(")");
+      }
+      else print(car(c));
+      if (!cdr(c)) return 0;
 
-            catf(" ");
-            if (CELL_TYPE(cdr(c)) != PAIR)
-                catf(". ");
-            return print(cdr(c));
-        case S64:
-            return catf("%ld", S64_VAL(c));
-        case SYMBOL:
-            return catf("%s", SYM_STR(c));
-        case NATIVE_FUNCTION:
-            return catf("NATIVE_FUNCTION<%p>", CELL_DEREF(c).fn);
-        case FFI_FUNCTION:
-            return catf("FFI_FUNCTION<%p>", CELL_DEREF(c).fn);
-        case FFI_LIBRARY:
-            return catf("FFI_LIBRARY<%p>", CELL_DEREF(c).handle);
-        case LAMBDA:
-            catf("(lambda (");
-            print(CELL_PTR(c)->args);
-            catf(") ");
-            print(CELL_PTR(c)->body);
-            return catf(")");
-        case NIL:
-            return catf("()");
-        default:
-            return catf("UNKNOWN<%p>", c);
+      catf(" ");
+      if (CELL_TYPE(cdr(c)) != PAIR)
+        catf(". ");
+      return print(cdr(c));
+    case S64:
+        return catf("%ld", S64_VAL(c));
+    case SYMBOL:
+        return catf("%s", SYM_STR(c));
+    case NATIVE_FN:
+    case NATIVE_FN_ENV:
+    case NATIVE_FN_HELD_ARGS:
+    case NATIVE_FN_ENV_HELD_ARGS:
+        return catf("NATIVE_FUNCTION<%p>", CELL_PTR(c));
+    case FFI_FUNCTION:
+      return catf("FFI_FUNCTION<%p>", CELL_PTR(c));
+    case FFI_LIBRARY:
+      return catf("FFI_LIBRARY<%p>", CELL_PTR(c));
+    case LAMBDA:
+      catf("(lambda (");
+      print(CELL_PTR(c)->args);
+      catf(") ");
+      print(CELL_PTR(c)->body);
+      return catf(")");
+    case NIL:
+      return catf("()");
+    default:
+      return catf("UNKNOWN<%p>", c);
     }
 }
 
@@ -140,13 +143,54 @@ char* print_env(cell c) {
     buf_index = 0;
     catf("(");
     while (IS_PAIR(c)) {
-        if(!IS_PAIR(car(c))) break;
-        if(CELL_TYPE(caar(c)) != SYMBOL) break;
-        if(!strcmp(SYM_STR(caar(c)), "GLOBALS")) break;
+        if (!IS_PAIR(car(c))) break;
+        if (CELL_TYPE(caar(c)) != SYMBOL) break;
+        if (!strcmp(SYM_STR(caar(c)), "GLOBALS")) break;
         catf("\n");
         print(car(c));
         c = cdr(c);
     }
     catf(")");
     return buf;
+}
+
+void reset_logical_line(logical_line* line) {
+    line->in_comment = false;
+    line->parens = 0;
+    line->len = 0;
+    line->str = GC_MALLOC(128);
+    line->max_len = 128;
+}
+
+// ingest a new character into a logical line, and return true
+// if the logical line is complete and can be parsed
+bool logical_line_ingest(logical_line* line, char c) {
+    switch (c) {
+        case '\n':
+            line->in_comment = false;
+            if (line->parens != 0) {
+                c = ' ';
+                break;
+            }
+        case '\0':
+            line->str[line->len] = '\0';
+            return true;
+        case ';':
+            line->in_comment = true;
+            return false;
+        case '(':
+            line->parens++;
+            break;
+        case ')':
+            line->parens--;
+            break;
+        default:
+            break;
+    }
+    if (line->in_comment) return false;
+
+    line->str[line->len++] = c;
+    if (line->len >= line->max_len)
+        line->str = GC_REALLOC(line->str, line->max_len *= 2);
+    return false;
 }

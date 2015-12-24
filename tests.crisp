@@ -1,3 +1,5 @@
+import std
+
 ; These are some test cases which highlight and exercise functionality.
 ; Each logical line in this script should evaluate to pass
 

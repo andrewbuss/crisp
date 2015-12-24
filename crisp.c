@@ -4,11 +4,11 @@
 
 bool debug = false;
 cell global_env = NIL;
-char* stack_base = NULL;
+void* stack_base = NULL;
 cell sym_list = NIL;
 
-cell malloc_or_die(size_t size) {
-    cell rv = (cell) GC_MALLOC(size);
+void* malloc_or_die(size_t size) {
+    void* rv = GC_MALLOC(size);
     if (!rv) {
         puts("malloc failed");
         exit(-1);
@@ -17,17 +17,16 @@ cell malloc_or_die(size_t size) {
 }
 
 cell make_s64(int64_t x) {
-    cell rv = malloc_or_die(8);
+    cell rv = (cell) malloc_or_die(8);
     *(int64_t*) rv = x;
     return rv | S64;
 }
 
-cell make_native_function(void* fn, int with_env, int hold_args) {
-    cell c = (cell) malloc_or_die(16);
-    CELL_DEREF(c).fn = fn;
-    CELL_DEREF(c).with_env = with_env;
-    CELL_DEREF(c).hold_args = hold_args;
-    return c | NATIVE_FUNCTION;
+cell make_native_function(void* fn, bool with_env, bool hold_args) {
+    cell type = NATIVE_FN;
+    if(with_env) type += (1LL << 48);
+    if(hold_args) type += (2LL << 48);
+    return (cell) fn | type;
 }
 
 cell cons(cell car, cell cdr) {
@@ -58,13 +57,15 @@ cell sym_dedupe(cell list, char* symbol) {
     return sym_dedupe(cdr(list), symbol);
 }
 
-
+// Create a new symbol from the passed string
+// If the symbol already exists, return the already created one
 cell sym(char* symbol) {
     cell deduped = sym_dedupe(sym_list, symbol);
-    if(deduped) return deduped;
-    sym_list = cons((cell)strdup(symbol) | SYMBOL, sym_list);
+    if (deduped) return deduped;
+    sym_list = cons((cell) strdup(symbol) | SYMBOL, sym_list);
     return car(sym_list);
 }
+
 
 // Builtin functions
 
@@ -100,14 +101,6 @@ cell cons_fn(cell args, cell env) {
     return cons(car(args), cdar(args));
 }
 
-cell ispair(cell args, cell env) {
-    // ispair 4 ->
-    // ispair () -> ()
-    // ispair (a b) -> (a b)
-    if (!args) return NIL;
-    return IS_PAIR(car(args)) ? car(args) : (cell) NIL;
-}
-
 // Check for pointer equality among args
 // If one argument is not equal, returns NIL
 // Otherwise returns the first argument
@@ -123,7 +116,7 @@ cell same(cell args, cell env) {
     if (!args) return NIL;
     cell first = car(args);
     cell rest = cdr(args);
-    if (!rest || (ispair(rest, NIL) && (first == same(rest, NIL)))) return first;
+    if (!rest || (IS_PAIR(rest) && (first == same(rest, NIL)))) return first;
     return NIL;
 }
 
@@ -167,32 +160,6 @@ cell concat(cell first, cell rest) {
         return cons(first, rest);
 }
 
-// Concatenate arguments
-cell concat_fn(cell args, cell env) {
-    // concat (a b) c (d e) -> a b c d e
-    // concat ((a b) (c d)) e -> (a b) (c d) e
-    // concat a -> a
-    // concat a . b -> a b
-    if (!args) return NIL;
-    if (!IS_PAIR(args)) return LIST1(args);
-    cell first = car(args);
-    if (!IS_PAIR(first)) first = LIST1(first);
-    return concat(first, concat_fn(cdr(args), NIL));
-}
-
-// Pair up items from a left and right list into a
-// new list of cons pairs until one list runs out
-cell zip_fn(cell args, cell env) {
-    // zip (a b c) (d e) -> (a . d) (b . e)
-    // zip () () ->
-    // zip ->
-    // zip a b ->
-    // zip (a b) (c . d) -> (a . c)
-    if (!args || !IS_PAIR(cdr(args))) return NIL;
-    cell a = car(args), b = cdar(args);
-    return zip(a, b);
-}
-
 cell zip(cell a, cell b) {
     if (!IS_PAIR(a) || !IS_PAIR(b)) return NIL;
     return cons(cons(car(a), car(b)), zip(cdr(a), cdr(b)));
@@ -204,40 +171,28 @@ cell assoc(cell key, cell dict) {
     return assoc(key, cdr(dict));
 }
 
-cell assoc_fn(cell args, cell env) {
-    if (!args || !IS_PAIR(cdr(args))) return NIL;
-    cell key = car(args), dict = cdar(args);
-    return assoc(key, dict);
-}
-
-cell apply_fn(cell args, cell env) {
-    if (!args) return NIL;
-    cell fn = car(args);
-    if (!IS_CALLABLE(fn)) return NIL;
-    if (!IS_PAIR(cdr(args))) args = NIL;
-    else args = cdar(args);
-    return apply(fn, args, env);
-}
-
 cell apply(cell fn, cell args, cell env) {
     if (!IS_PAIR(args)) args = LIST1(args);
     DPRINTF("Applying %s to %s\n", print_cell(fn), print_cell(args));
-    if (CELL_TYPE(fn) == LAMBDA) {
+    switch(CELL_TYPE(fn)){
+    case LAMBDA: {
         cell new_def = zip(CELL_PTR(fn)->args, args);
         cell new_env = concat(new_def, CELL_PTR(fn)->env);
         return eval(CELL_PTR(fn)->body, new_env);
     }
-    else if (CELL_TYPE(fn) == NATIVE_FUNCTION) {
-        return CELL_DEREF(fn).fn(args, env);
-    }
+    case NATIVE_FN:
+    case NATIVE_FN_HELD_ARGS:
+        return FN_PTR(fn)(args);
+    case NATIVE_FN_ENV:
+    case NATIVE_FN_ENV_HELD_ARGS:
+        return FN_PTR(fn)(args, env);
 #ifndef DISABLE_FFI
-    else if (CELL_TYPE(fn) == FFI_FUNCTION) {
-        return apply_ffi_function(fn, args);
-    }
+    case FFI_FUNCTION:
+      return apply_ffi_function(FFI_FN(fn), args);
 #endif
-    return NIL;
+    default: return NIL;
+    }
 }
-
 
 cell quote(cell args, cell env) { return args; }
 
@@ -271,7 +226,7 @@ cell evalmap(cell args, cell env) {
 cell eval(cell c, cell env) {
     // Hack to limit recursion depth
     // It is otherwise trivial to crash the interpeter with infinite recursion
-    if (stack_base - (char*) (&c) > 0x40000) {
+    if (stack_base - (void*) &c > 0x40000) {
         puts("Stack overflowed");
         exit(-1);
     }
@@ -286,7 +241,7 @@ cell eval(cell c, cell env) {
         // x . y -> 1 . 2
         if (!IS_PAIR(rest)) return cons(first, eval(rest, env));
         if (IS_CALLABLE(first)) {
-            if (CELL_TYPE(first) != NATIVE_FUNCTION || !CELL_DEREF(first).hold_args)
+            if (CELL_TYPE(first) != NATIVE_FN_HELD_ARGS && CELL_TYPE(first) != NATIVE_FN_ENV_HELD_ARGS)
                 rest = evalmap(rest, env);
             // apply f to args
             return apply(first, rest, env);
@@ -302,8 +257,6 @@ cell eval(cell c, cell env) {
 
 #ifndef DISABLE_FFI
         cell ffi_fn = find_ffi_function((char*) CELL_PTR(c), env);
-
-        // libc.puts -> FFI_FUNCTION<...>
         if (ffi_fn) return ffi_fn;
 #endif
     }
@@ -327,17 +280,4 @@ cell with(cell args, cell env) {
     if (CELL_TYPE(var_name) != SYMBOL) return NIL;
     DPRINTF("With %s -> %s\n", print_cell(var_name), print_cell(referent));
     return eval(cddr(args), cons(cons(var_name, referent), env));
-}
-
-cell hash(cell args, cell env) {
-    if (!args) return make_s64(0);
-    if (CELL_TYPE(car(args)) != SYMBOL) return make_s64((uint64_t) car(args));
-
-    // djb2 best hash
-    uint64_t hash = 5381;
-    char* s = SYM_STR(car(args));
-    while (*s)
-        hash = ((hash << 5) + hash) + *(s++);
-
-    return make_s64(hash);
 }

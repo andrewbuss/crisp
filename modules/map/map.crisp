@@ -1,0 +1,16 @@
+depends ()
+register-types (MAP)
+register-native-functions (mkmap map_lookup)
+
+; Override the existing assoc implementation by adding a handler for MAP type
+def assoc (
+    with MAP (deref-s64 this.MAP)
+    with old-assoc assoc
+    lambda (key dict)
+        ; is the dict a MAP? if so, use the MAP lookup!
+        ; otherwise fall back to whatever we were using before
+        (apply (if (equal (typeof dict) MAP)
+            this.map_lookup
+            old-assoc) (key dict)))    
+
+'(loaded map successfully)
