@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.6)
 
 project(crisp C)
 find_package(Threads)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(.)
 
 add_definitions(-DPOINTER_MASK=0x0000FFFFFFFFFFFF)
 add_subdirectory(bdwgc EXCLUDE_FROM_ALL)
