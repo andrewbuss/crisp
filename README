@@ -1,42 +1,84 @@
-crisp: a C lisp
+crisp: the simplest C Lisp that could possibly work
 
 Repo contents:
 
-    crisp.h       : header file with all native definitions
+    crisp.h       : header file with core declarations
     crisp.c       : the core, including cell allocation and evaluation
     parse.c       : routines for converting between cells and strings
-    math.c        : routines for numbers
     ffi.c         : routines supporting the foreign function interface
     interpreter.c : REPL
 
-    fuzz_parser.c : a small program to exercise the parser and verify
-                    round-trip stability. Only useful for fuzzing
-
-    stdlib.crisp    : a prelude containing many useful functions for tests:
+    modules/std     : a module containing important functions which are
+      |               not required to implement the minimal interpreter
+      + std.c       : wrappers around zip, concat, apply, assoc which conform
+      |               to the native function interface, plus hash and ispair,
+      |               plus asc, sum, product, and modulus
+      + std.crisp   : declare the above native functions in the global env
+                      This also contains many useful lambda functions:
                       nil, not, and, nand, or, nor, neq, dec, inc,
                       void, makerec, defrec, test, testwith, list-equal,
                       c{a,d}{a,d}r, reduce, map, all, any, none, filter,
                       reverse-concat, reverse, reversed-range, range,
                       repeat, zip, len
+
     tests.crisp     : an assortment of tests and additional syntax examples
     libc_demo.crisp : a few examples using the FFI with libc
     bintree.crisp   : an implementation of a basic persistent binary tree map
 
+    fuzz_parser.c   : a small program to exercise the parser and verify
+                      round-trip stability. Only useful for fuzzing
+
 Building:
 
     git submodule update --init
-    ln -s ../libatomic_ops bdwgc/libatomic_ops
+    ln -sr libatomic_ops bdwgc
     cmake .
-    make crisp
-    make install
+    make
+
+    # optionally, install with all modules; read Modules below
+    sudo make install
 
 Some syntax examples and testing code are in the tests file. Run tests:
 
-    cat stdlib.crisp tests.crisp | crisp
+    crisp < tests.crisp
 
 Run as a REPL:
 
-    cat stdlib.crisp - | crisp
+    crisp
+
+Modules:
+
+    crisp.c contains the minimal evaluation logic, but many common functions
+    are implemented in the std module. A module is a crisp script, optionally
+    combined with any number of compiled object files, linked into a shared
+    library. When a module is loaded with the `import` function, the script is
+    executed in an environment with a few extra mappings:
+
+        this            : an FFI_LIBRARY, the module currently being loaded
+        native-function : convert an FFI_SYMBOL into a NATIVE_FUNCTION
+
+    In practice, a module will contain `def`'s to define new functions in the
+    global environment. For example:
+
+        def hash native-function this.hash
+
+    will expose `hash` for use after the module is imported. Private functions
+    need not be declared in this way.
+
+    Modules are loaded at runtime using the `import` function. Modules may
+    import other modules similarly, although crisp does not attempt to detect
+    or resolve circular dependencies.
+
+    Modules are installed by default to /usr/lib/ with filenames of the form
+    `libstd.crisp.so`. In addition to the default library paths, `import`
+    tries to find a library named `std` in:
+
+        `$CRISP_MODULE_PATH/modules/libstd.crisp.so`
+        `$CRISP_MODULE_PATH/std/libstd.crisp.so`
+
+    where CRISP_MODULE_PATH is an environment variable that may be provided at
+    runtime, and defaults to `./modules/` if not provided. If imports are
+    failing, check that modules are reachable from the current directory.
 
 Syntax notes:
 

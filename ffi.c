@@ -38,7 +38,7 @@ cell dlsym_fn(cell args, cell env) {
         return NIL;
     if (!IS_PAIR(cdr(args)) || CELL_TYPE(cdar(args)) != SYMBOL)
         return NIL;
-    void* sym = dlsym((void*)CELL_PTR(car(args)), SYM_STR(cdar(args)));
+    void* sym = dlsym((void*) CELL_PTR(car(args)), SYM_STR(cdar(args)));
 
     if (!sym) return NIL;
     return (cell) sym | FFI_FUNCTION;
@@ -49,16 +49,16 @@ cell dlopen_fn(cell args, cell env) {
     if (!IS_PAIR(args) || CELL_TYPE(car(args)) != SYMBOL) return NIL;
     void* handle = dlopen(SYM_STR(car(args)), RTLD_LAZY);
     if (!handle) return NIL;
-    return (cell)handle | FFI_LIBRARY;
+    return (cell) handle | FFI_LIBRARY;
 }
 
 // Apply an FFI_FUNCTION to up to 5 arguments
 // Symbols are passed as strings, S64's are passed as longs
-cell apply_ffi_function(int64_t (fn)(), cell args) {
+cell apply_ffi_function(int64_t (* fn)(), cell args) {
     // Hardcode cases for up to 5 args
     void* ffi_args[5];
     int i = 0;
-    
+
     for (; IS_PAIR(args) && i < 5; args = cdr(args), i++) {
         cell arg = car(args);
         if (CELL_TYPE(arg) == SYMBOL)
@@ -92,10 +92,26 @@ cell import(cell args, cell env) {
     char* lib_name = SYM_STR(car(args));
 
     char* lib_filename = NULL;
-    asprintf(&lib_filename, "lib%s.crisp.so", lib_name);
-    void* handle = dlopen(lib_filename, RTLD_LAZY);
-    if (!handle) return NIL;
+    void* handle;
+    char* module_path = getenv("CRISP_MODULE_PATH");
+    if (!module_path) module_path = "./modules";
+    module_path = realpath(module_path, NULL);
+    asprintf(&lib_filename, "%s/%s/lib%s.crisp.so", module_path, lib_name, lib_name);
+    handle = dlopen(lib_filename, RTLD_LAZY);
+    DPRINTF("Loading from %s: %p\n", lib_filename, handle);
+    if (!handle) {
+        asprintf(&lib_filename, "%s/lib%s.crisp.so", module_path, lib_name);
+        handle = dlopen(lib_filename, RTLD_LAZY);
+        DPRINTF("Loading from %s: %p\n", lib_filename, handle);
+    }
+    if (!handle) {
+        asprintf(&lib_filename, "lib%s.crisp.so", lib_name);
+        handle = dlopen(lib_filename, RTLD_LAZY);
+        DPRINTF("Loading from %s: %p\n", lib_filename, handle);
+    }
     free(lib_filename);
+    free(module_path);
+    if (!handle) return NIL;
 
     char* sym_name = NULL;
     asprintf(&sym_name, "_binary_%s_crisp_start", lib_name);
@@ -105,7 +121,7 @@ cell import(cell args, cell env) {
     char* script_end = dlsym(handle, sym_name);
     free(sym_name);
 
-    if(!script || !script_end) return NIL;
+    if (!script || !script_end) return NIL;
 
     cell this_lib = (cell) handle | FFI_LIBRARY;
     cell mapping_this_lib = cons(sym("this"), this_lib);
@@ -118,19 +134,19 @@ cell import(cell args, cell env) {
     cell evalled = NIL;
 
     while (script < script_end) {
-      if (!logical_line_ingest(&ll, *script++)) continue;
-      cell expr = parse(&ll.str);
-      if (expr) {
-        DPRINTF("Parsed %s\n", print_cell(expr));
-        evalled = eval(expr, new_env);
-      }
-      reset_logical_line(&ll);
+        if (!logical_line_ingest(&ll, *script++)) continue;
+        cell expr = parse(&ll.str);
+        if (expr) {
+            DPRINTF("Parsed %s\n", print_cell(expr));
+            evalled = eval(expr, new_env);
+        }
+        reset_logical_line(&ll);
     }
 
     return evalled;
 }
 
-cell native_function(cell args, cell env){
-    if(!args) return NIL;
+cell native_function(cell args, cell env) {
+    if (!args) return NIL;
     return (cell) CELL_PTR(car(args)) | NATIVE_FN;
 }
