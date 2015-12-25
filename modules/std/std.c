@@ -30,7 +30,7 @@ cell concat_fn(cell args, cell env) {
 
 cell hash(cell args, cell env) {
     if (!args) return make_s64(0);
-    if (CELL_TYPE(car(args)) != SYMBOL) return make_s64((uint64_t) car(args));
+    if (TYPE(car(args)) != SYMBOL) return make_s64((uint64_t) car(args));
 
     // djb2 best hash
     uint64_t hash = 5381;

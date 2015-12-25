@@ -4,7 +4,7 @@ cell sum(cell args, cell env) {
     // sum 1 2 -> 3
     // sum 1 () 2 -> 1
     // sum -> 0
-    if (!args || CELL_TYPE(car(args)) != S64) return make_s64(0);
+    if (!args || TYPE(car(args)) != S64) return make_s64(0);
     int64_t first = S64_VAL(car(args));
     if (!IS_PAIR(cdr(args))) return make_s64(first);
     return make_s64(first + S64_VAL(sum(cdr(args), NIL)));
@@ -14,7 +14,7 @@ cell product(cell args, cell env) {
     // product 2 3 -> 6
     // product 4 () 2 -> 4
     // product -> 1
-    if (!args || CELL_TYPE(car(args)) != S64) return make_s64(1);
+    if (!args || TYPE(car(args)) != S64) return make_s64(1);
     return make_s64(S64_VAL(car(args)) * S64_VAL(product(cdr(args), NIL)));
 }
 

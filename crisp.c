@@ -24,29 +24,29 @@ cell make_s64(int64_t x) {
 
 cell make_native_function(void* fn, bool with_env, bool hold_args) {
     cell type = NATIVE_FN;
-    if(with_env) type += (1LL << 48);
-    if(hold_args) type += (2LL << 48);
-    return (cell) fn | type;
+    if (with_env) type += (1LL << 48);
+    if (hold_args) type += (2LL << 48);
+    return CAST(fn, type);
 }
 
 cell cons(cell car, cell cdr) {
     cell c = (cell) malloc_or_die(16);
-    CELL_DEREF(c).car = car;
-    CELL_DEREF(c).cdr = cdr;
+    ((pair*) c)->car = car;
+    ((pair*) c)->cdr = cdr;
     return c | PAIR;
 }
 
 cell lambda(cell args, cell env) {
     if (!args) return NIL;
     cell lambda_args = car(args);
-    if (CELL_TYPE(lambda_args) == SYMBOL)
+    if (TYPE(lambda_args) == SYMBOL)
         lambda_args = LIST1(lambda_args);
     cell body = cdr(args);
     DPRINTF("Making lambda %s = %s in %s\n", print_cell(lambda_args), print_cell(body), print_env(env));
     cell c = (cell) malloc_or_die(24);
-    CELL_DEREF(c).args = lambda_args;
-    CELL_DEREF(c).body = body;
-    CELL_DEREF(c).env = env;
+    ((lambda_t*) c)->args = lambda_args;
+    ((lambda_t*) c)->body = body;
+    ((lambda_t*) c)->env = env;
     return c | LAMBDA;
 }
 
@@ -62,7 +62,7 @@ cell sym_dedupe(cell list, char* symbol) {
 cell sym(char* symbol) {
     cell deduped = sym_dedupe(sym_list, symbol);
     if (deduped) return deduped;
-    sym_list = cons((cell) strdup(symbol) | SYMBOL, sym_list);
+    sym_list = cons(CAST(strdup(symbol), SYMBOL), sym_list);
     return car(sym_list);
 }
 
@@ -174,23 +174,24 @@ cell assoc(cell key, cell dict) {
 cell apply(cell fn, cell args, cell env) {
     if (!IS_PAIR(args)) args = LIST1(args);
     DPRINTF("Applying %s to %s\n", print_cell(fn), print_cell(args));
-    switch(CELL_TYPE(fn)){
-    case LAMBDA: {
-        cell new_def = zip(CELL_PTR(fn)->args, args);
-        cell new_env = concat(new_def, CELL_PTR(fn)->env);
-        return eval(CELL_PTR(fn)->body, new_env);
-    }
-    case NATIVE_FN:
-    case NATIVE_FN_HELD_ARGS:
-        return FN_PTR(fn)(args);
-    case NATIVE_FN_ENV:
-    case NATIVE_FN_ENV_HELD_ARGS:
-        return FN_PTR(fn)(args, env);
+    switch (TYPE(fn)) {
+        case LAMBDA: {
+            lambda_t* l = (lambda_t*)PTR(fn);
+            cell new_env = concat(zip(l->args, args), l->env);
+            return eval(l->body, new_env);
+        }
+        case NATIVE_FN:
+        case NATIVE_FN_HELD_ARGS:
+            return FN_PTR(fn)(args);
+        case NATIVE_FN_ENV:
+        case NATIVE_FN_ENV_HELD_ARGS:
+            return FN_PTR(fn)(args, env);
 #ifndef DISABLE_FFI
-    case FFI_FUNCTION:
-      return apply_ffi_function(FFI_FN(fn), args);
+        case FFI_FUNCTION:
+            return apply_ffi_function(FFI_FN(fn), args);
 #endif
-    default: return NIL;
+        default:
+            return NIL;
     }
 }
 
@@ -241,7 +242,7 @@ cell eval(cell c, cell env) {
         // x . y -> 1 . 2
         if (!IS_PAIR(rest)) return cons(first, eval(rest, env));
         if (IS_CALLABLE(first)) {
-            if (CELL_TYPE(first) != NATIVE_FN_HELD_ARGS && CELL_TYPE(first) != NATIVE_FN_ENV_HELD_ARGS)
+            if (TYPE(first) != NATIVE_FN_HELD_ARGS && TYPE(first) != NATIVE_FN_ENV_HELD_ARGS)
                 rest = evalmap(rest, env);
             // apply f to args
             return apply(first, rest, env);
@@ -249,14 +250,14 @@ cell eval(cell c, cell env) {
         // x y -> 1 2
         return cons(first, evalmap(rest, env));
     }
-    else if (CELL_TYPE(c) == SYMBOL) {
+    else if (TYPE(c) == SYMBOL) {
         cell resolved_symbol = assoc(c, env);
-        //DPRINTF("Looked up %s in %s, found %s\n", print_cell(c), print_cell(env), print_cell(resolved_symbol));
+        DPRINTF("Looked up %s in %s, found %s\n", print_cell(c), print_cell(env), print_cell(resolved_symbol));
         // x -> 1
         if (resolved_symbol) return cdr(resolved_symbol);
 
 #ifndef DISABLE_FFI
-        cell ffi_fn = find_ffi_function((char*) CELL_PTR(c), env);
+        cell ffi_fn = find_ffi_function(SYM_STR(c), env);
         if (ffi_fn) return ffi_fn;
 #endif
     }
@@ -266,9 +267,10 @@ cell eval(cell c, cell env) {
 cell def(cell args, cell env) {
     cell referent = eval(cdr(args), env);
     cell var_name = eval(car(args), env);
-    if (CELL_TYPE(var_name) != SYMBOL) var_name = car(args);
+    if (TYPE(var_name) != SYMBOL) var_name = car(args);
     DPRINTF("Defining %s -> %s\n", print_cell(var_name), print_cell(referent));
-    cdr(global_env) = cons(cons(var_name, referent), cdr(global_env));
+    cell old_defs = ((pair*)PTR(global_env))->cdr;
+    ((pair*)PTR(global_env))->cdr = cons(cons(var_name, referent), old_defs);
     return NIL;
 }
 
@@ -277,7 +279,7 @@ cell with(cell args, cell env) {
     cell referent = eval(cdar(args), env);
     if (!IS_PAIR(cddr(args))) return NIL;
     cell var_name = car(args);
-    if (CELL_TYPE(var_name) != SYMBOL) return NIL;
+    if (TYPE(var_name) != SYMBOL) return NIL;
     DPRINTF("With %s -> %s\n", print_cell(var_name), print_cell(referent));
     return eval(cddr(args), cons(cons(var_name, referent), env));
 }

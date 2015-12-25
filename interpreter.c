@@ -10,8 +10,8 @@ int main(int argc, char** argv) {
 
     stack_base = &argc;
 
-    //                                                         with_env, hold_args
-    global_env = cons(cons(sym("if"), make_native_function(if_fn, true, true)), NIL);
+
+    global_env = cons(cons(sym("if"), make_native_function(if_fn, true, true)), global_env);
     global_env = cons(cons(sym("eval"), make_native_function(eval, true, false)), global_env);
     global_env = cons(cons(sym("quote"), make_native_function(quote, false, true)), global_env);
     global_env = cons(cons(sym("lambda"), make_native_function(lambda, true, true)), global_env);

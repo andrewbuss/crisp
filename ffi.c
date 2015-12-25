@@ -25,7 +25,7 @@ cell find_ffi_function(char* sym_name, cell env) {
     if (!lib) return NIL;
 
     lib = cdr(lib);
-    if (CELL_TYPE(lib) != FFI_LIBRARY)
+    if (TYPE(lib) != FFI_LIBRARY)
         return NIL;
 
     return dlsym_fn(LIST2(lib, (cell) dot | SYMBOL), NIL);
@@ -34,11 +34,11 @@ cell find_ffi_function(char* sym_name, cell env) {
 // Try to resolve a symbol in a specific shared library
 // dlsym (dlopen libc.so.6) puts -> FFI_FUNCTION<...>
 cell dlsym_fn(cell args, cell env) {
-    if (!args || CELL_TYPE(car(args)) != FFI_LIBRARY || !IS_PAIR(cdr(args)))
+    if (!args || TYPE(car(args)) != FFI_LIBRARY || !IS_PAIR(cdr(args)))
         return NIL;
-    if (!IS_PAIR(cdr(args)) || CELL_TYPE(cdar(args)) != SYMBOL)
+    if (!IS_PAIR(cdr(args)) || TYPE(cdar(args)) != SYMBOL)
         return NIL;
-    void* sym = dlsym((void*) CELL_PTR(car(args)), SYM_STR(cdar(args)));
+    void* sym = dlsym((void*) PTR(car(args)), SYM_STR(cdar(args)));
 
     if (!sym) return NIL;
     return (cell) sym | FFI_FUNCTION;
@@ -46,7 +46,7 @@ cell dlsym_fn(cell args, cell env) {
 
 // Open a shared library by name
 cell dlopen_fn(cell args, cell env) {
-    if (!IS_PAIR(args) || CELL_TYPE(car(args)) != SYMBOL) return NIL;
+    if (!IS_PAIR(args) || TYPE(car(args)) != SYMBOL) return NIL;
     void* handle = dlopen(SYM_STR(car(args)), RTLD_LAZY);
     if (!handle) return NIL;
     return (cell) handle | FFI_LIBRARY;
@@ -61,12 +61,12 @@ cell apply_ffi_function(int64_t (* fn)(), cell args) {
 
     for (; IS_PAIR(args) && i < 5; args = cdr(args), i++) {
         cell arg = car(args);
-        if (CELL_TYPE(arg) == SYMBOL)
+        if (TYPE(arg) == SYMBOL)
             ffi_args[i] = SYM_STR(arg);
-        else if (CELL_TYPE(arg) == S64)
+        else if (TYPE(arg) == S64)
             ffi_args[i] = (void*) S64_VAL(arg);
-        else if (CELL_TYPE(arg) == FFI_FUNCTION)
-            ffi_args[i] = (void*) CELL_PTR(arg);
+        else if (TYPE(arg) == FFI_FUNCTION)
+            ffi_args[i] = (void*) PTR(arg);
         else
             ffi_args[i] = NULL;
     }
@@ -88,7 +88,7 @@ cell apply_ffi_function(int64_t (* fn)(), cell args) {
 }
 
 cell import(cell args, cell env) {
-    if (!args || CELL_TYPE(car(args)) != SYMBOL) return NIL;
+    if (!args || TYPE(car(args)) != SYMBOL) return NIL;
     char* lib_name = SYM_STR(car(args));
 
     char* lib_filename = NULL;
@@ -148,5 +148,5 @@ cell import(cell args, cell env) {
 
 cell native_function(cell args, cell env) {
     if (!args) return NIL;
-    return (cell) CELL_PTR(car(args)) | NATIVE_FN;
+    return (cell) PTR(car(args)) | NATIVE_FN;
 }

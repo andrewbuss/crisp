@@ -73,8 +73,8 @@ Modules:
     `libstd.crisp.so`. In addition to the default library paths, `import`
     tries to find a library named `std` in:
 
-        `$CRISP_MODULE_PATH/modules/libstd.crisp.so`
-        `$CRISP_MODULE_PATH/std/libstd.crisp.so`
+        $CRISP_MODULE_PATH/modules/libstd.crisp.so
+        $CRISP_MODULE_PATH/std/libstd.crisp.so
 
     where CRISP_MODULE_PATH is an environment variable that may be provided at
     runtime, and defaults to `./modules/` if not provided. If imports are

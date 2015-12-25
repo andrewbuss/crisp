@@ -9,5 +9,5 @@ uint64_t MAP;
 
 cell mkmap(cell args, cell env) {
     if (!args) return NIL;
-    return (MAP | (cell) CELL_PTR(car(args)));
+    return CAST(car(args), MAP);
 }
