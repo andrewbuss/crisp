@@ -6,7 +6,7 @@ script:
   - git submodule update --init
   - ln -s ../libatomic_ops bdwgc/libatomic_ops
   - cmake . -DCMAKE_BUILD_TYPE=Release
-  - make VERBOSE=1
+  - make
   - cat tests.crisp | ./crisp | tee test.log
   - (! grep -v pass test.log)
   - cat libc_demo.crisp | ./crisp
