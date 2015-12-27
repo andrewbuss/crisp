@@ -10,7 +10,6 @@ int main(int argc, char** argv) {
 
     stack_base = &argc;
 
-
     global_env = cons(cons(sym("if"), make_native_function(if_fn, true, true)), global_env);
     global_env = cons(cons(sym("eval"), make_native_function(eval, true, false)), global_env);
     global_env = cons(cons(sym("quote"), make_native_function(quote, false, true)), global_env);
@@ -23,6 +22,8 @@ int main(int argc, char** argv) {
     global_env = cons(cons(sym("same"), make_native_function(same, false, false)), global_env);
     global_env = cons(cons(sym("def"), make_native_function(def, true, true)), global_env);
     global_env = cons(cons(sym("with"), make_native_function(with, true, true)), global_env);
+    global_env = cons(cons(sym("macro"), make_native_function(macro, true, true)), global_env);
+    global_env = cons(cons(sym("apply"), make_native_function(apply_fn, true, false)), global_env);
 
 #ifndef DISABLE_FFI
     global_env = cons(cons(sym("dlopen"), make_native_function(dlopen_fn, false, false)), global_env);
@@ -53,7 +54,13 @@ int main(int argc, char** argv) {
             return 0;
         char* i = line;
         while (*i) {
-            if (!logical_line_ingest(&ll, *i++)) continue;
+            if (!logical_line_ingest(&ll, *i++)){
+                if (ll.parens < 0) {
+                    reset_logical_line(&ll);
+                    break;
+                }
+                continue;
+            }
             cell expr = parse(&ll.str);
             if (expr) {
                 DPRINTF("Parsed %s\n", print_cell(expr));

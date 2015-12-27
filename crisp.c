@@ -36,18 +36,28 @@ cell cons(cell car, cell cdr) {
     return c | PAIR;
 }
 
-cell lambda(cell args, cell env) {
-    if (!args) return NIL;
-    cell lambda_args = car(args);
-    if (TYPE(lambda_args) == SYMBOL)
-        lambda_args = LIST1(lambda_args);
-    cell body = cdr(args);
-    DPRINTF("Making lambda %s = %s in %s\n", print_cell(lambda_args), print_cell(body), print_env(env));
-    cell c = (cell) malloc_or_die(24);
-    ((lambda_t*) c)->args = lambda_args;
+cell make_lambda(cell args, cell body, cell env) {
+    DPRINTF("\x1b[33m" "Making lambda %s = %s in %s\n" "\x1b[0m", print_cell(args), print_cell(body), print_env(env));
+    cell c = (cell) malloc_or_die(sizeof(lambda_t));
+    ((lambda_t*) c)->args = args;
     ((lambda_t*) c)->body = body;
     ((lambda_t*) c)->env = env;
     return c | LAMBDA;
+}
+
+cell lambda(cell args, cell env) {
+    if (!args) return NIL;
+    cell body = cdr(args);
+    args = car(args);
+    if (!IS_PAIR(args)) args = LIST1(args);
+    return make_lambda(args, body, env);
+}
+
+// A macro is identical to a lambda except that args are left
+// unevaluated before being passed in, so the macro has full
+// control over the evaluation of its inputs
+cell macro(cell args, cell env) {
+    return CAST(lambda(args, env), MACRO);
 }
 
 // Look up symbol in list
@@ -165,6 +175,13 @@ cell zip(cell a, cell b) {
     return cons(cons(car(a), car(b)), zip(cdr(a), cdr(b)));
 }
 
+static cell zip_args(cell a, cell b){
+    if(!a) return NIL;
+    if(!IS_PAIR(a)) return LIST1(cons(a, b));
+    if (!IS_PAIR(b)) return NIL;
+    return cons(cons(car(a), car(b)), zip_args(cdr(a), cdr(b)));
+}
+
 cell assoc(cell key, cell dict) {
     if (!IS_PAIR(dict) || !IS_PAIR(car(dict))) return NIL;
     if (equal(key, caar(dict))) return car(dict);
@@ -173,12 +190,17 @@ cell assoc(cell key, cell dict) {
 
 cell apply(cell fn, cell args, cell env) {
     if (!IS_PAIR(args)) args = LIST1(args);
-    DPRINTF("Applying %s to %s\n", print_cell(fn), print_cell(args));
+    DPRINTF("\x1b[32m" "Applying %s\n      to %s\n" "\x1b[0m", print_cell(fn), print_cell(args));
     switch (TYPE(fn)) {
-        case LAMBDA: {
-            lambda_t* l = (lambda_t*)PTR(fn);
-            cell new_env = concat(zip(l->args, args), l->env);
-            return eval(l->body, new_env);
+        case LAMBDA:
+        case MACRO: {
+            lambda_t* l = (lambda_t*) PTR(fn);
+            cell new_env;
+            if(!car(l->args) && TYPE(cdr(l->args)) == SYMBOL)
+                new_env = LIST1(cons(cdr(l->args), args));
+            else
+                new_env = zip_args(l->args, args);
+            return eval(l->body, concat(new_env, TYPE(fn) == MACRO ? env : l->env));
         }
         case NATIVE_FN:
         case NATIVE_FN_HELD_ARGS:
@@ -195,7 +217,16 @@ cell apply(cell fn, cell args, cell env) {
     }
 }
 
-cell quote(cell args, cell env) { return args; }
+cell apply_fn(cell args, cell env) {
+    if (!args) return NIL;
+    cell fn = car(args);
+    if (!IS_CALLABLE(fn)) return NIL;
+    if (!IS_PAIR(cdr(args))) args = NIL;
+    else args = cdar(args);
+    return apply(fn, args, env);
+}
+
+cell quote(cell args, cell env) { return args ? car(args) : NIL; }
 
 cell if_fn(cell args, cell env) {
     if (!args) return NIL;
@@ -227,14 +258,15 @@ cell evalmap(cell args, cell env) {
 cell eval(cell c, cell env) {
     // Hack to limit recursion depth
     // It is otherwise trivial to crash the interpeter with infinite recursion
-    if (stack_base - (void*) &c > 0x40000) {
+    uint64_t depth = stack_base - (void*) &c;
+    if (depth > 0x200000) {
         puts("Stack overflowed");
         exit(-1);
     }
     if IS_PAIR(c) {
-        DPRINTF("Evalling %s in %s\n", print_cell(c), print_env(env));
+        DPRINTF("\x1b[0m" "Evalling %s in %s\n" "\x1b[0m", print_cell(c), print_env(env));
         // () x y -> () 1 2
-        if (!car(c)) return evalmap(cdr(c), env);
+        if (!car(c)) return cons(NIL, evalmap(cdr(c), env));
         cell first = eval(car(c), env);
         cell rest = cdr(c);
         // (x y) -> 1 2
@@ -242,8 +274,15 @@ cell eval(cell c, cell env) {
         // x . y -> 1 . 2
         if (!IS_PAIR(rest)) return cons(first, eval(rest, env));
         if (IS_CALLABLE(first)) {
-            if (TYPE(first) != NATIVE_FN_HELD_ARGS && TYPE(first) != NATIVE_FN_ENV_HELD_ARGS)
-                rest = evalmap(rest, env);
+            switch (TYPE(first)) {
+                case NATIVE_FN:
+                case NATIVE_FN_ENV:
+                case LAMBDA:
+                case FFI_FUNCTION:
+                    rest = evalmap(rest, env);
+                default:
+                    break;
+            }
             // apply f to args
             return apply(first, rest, env);
         }
@@ -252,7 +291,7 @@ cell eval(cell c, cell env) {
     }
     else if (TYPE(c) == SYMBOL) {
         cell resolved_symbol = assoc(c, env);
-        DPRINTF("Looked up %s in %s, found %s\n", print_cell(c), print_cell(env), print_cell(resolved_symbol));
+//        DPRINTF("Looked up %s in %s, found %s\n", print_cell(c), print_cell(env), print_cell(resolved_symbol));
         // x -> 1
         if (resolved_symbol) return cdr(resolved_symbol);
 
@@ -268,18 +307,22 @@ cell def(cell args, cell env) {
     cell referent = eval(cdr(args), env);
     cell var_name = eval(car(args), env);
     if (TYPE(var_name) != SYMBOL) var_name = car(args);
-    DPRINTF("Defining %s -> %s\n", print_cell(var_name), print_cell(referent));
-    cell old_defs = ((pair*)PTR(global_env))->cdr;
-    ((pair*)PTR(global_env))->cdr = cons(cons(var_name, referent), old_defs);
+    DPRINTF("\x1b[31m" "Defining %s -> %s\n" "\x1b[0m", print_cell(var_name), print_cell(referent));
+    cell old_defs = ((pair*) PTR(global_env))->cdr;
+    ((pair*) PTR(global_env))->cdr = cons(cons(var_name, referent), old_defs);
     return NIL;
 }
 
 cell with(cell args, cell env) {
+    // with x ->
     if (!IS_PAIR(cdr(args))) return NIL;
     cell referent = eval(cdar(args), env);
+    // with x 2 ->
     if (!IS_PAIR(cddr(args))) return NIL;
     cell var_name = car(args);
-    if (TYPE(var_name) != SYMBOL) return NIL;
-    DPRINTF("With %s -> %s\n", print_cell(var_name), print_cell(referent));
+    // with 4 x ->
+    if (TYPE(var_name) != SYMBOL) var_name = eval(var_name, env);
+    DPRINTF("\x1b[31m" "With %s -> %s\n" "\x1b[0m", print_cell(var_name), print_cell(referent));
+    // with x 2 (sum x 4) -> sum 2 4
     return eval(cddr(args), cons(cons(var_name, referent), env));
 }

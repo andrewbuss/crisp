@@ -29,6 +29,7 @@
 #define LIST1(a) cons((a), NIL)
 #define LIST2(a, b) cons((a), cons((b), NIL))
 #define IS_CALLABLE(c) (TYPE(c) == LAMBDA || \
+                        TYPE(c) == MACRO || \
                         TYPE(c) == FFI_FUNCTION || \
                         TYPE(c) == NATIVE_FN || \
                         TYPE(c) == NATIVE_FN_ENV || \
@@ -50,6 +51,7 @@
 #define NATIVE_FN_ENV (8LL << 48)
 #define NATIVE_FN_HELD_ARGS (9LL << 48)
 #define NATIVE_FN_ENV_HELD_ARGS (10LL << 48)
+#define MACRO (11LL << 48)
 
 typedef uintptr_t cell;
 
@@ -80,35 +82,35 @@ void* malloc_or_die(size_t size);
 void reset_logical_line(logical_line* line);
 bool logical_line_ingest(logical_line* line, char c);
 
-cell make_s64(int64_t x);
-cell make_native_function(void* fn, bool with_env, bool hold_args);
-cell cons(cell car, cell cdr);
-cell sym(char* symbol);
-cell str(cell args, cell env);
+cell apply(cell fn, cell args, cell env);
+cell apply_fn(cell args, cell env);
+cell apply_ffi_function(int64_t (* fn)(), cell args);
+cell assoc(cell key, cell dict);
 cell car_fn(cell args, cell env);
 cell cdr_fn(cell args, cell env);
+cell concat(cell first, cell rest);
+cell cons(cell car, cell cdr);
 cell cons_fn(cell args, cell env);
-cell same(cell args, cell env);
-cell equal_fn(cell args, cell env);
-cell assoc(cell key, cell dict);
-cell find_ffi_function(char* sym_name, cell env);
+cell def(cell args, cell env);
 cell dlopen_fn(cell args, cell env);
 cell dlsym_fn(cell args, cell env);
-cell concat(cell first, cell rest);
-cell zip(cell args, cell env);
+cell equal_fn(cell args, cell env);
 cell eval(cell c, cell env);
-cell apply(cell fn, cell args, cell env);
-cell lambda(cell args, cell env);
-cell quote(cell args, cell env);
-cell if_fn(cell args, cell env);
 cell evalmap(cell args, cell env);
-cell def(cell args, cell env);
-cell with(cell args, cell env);
+cell find_ffi_function(char* sym_name, cell env);
+cell if_fn(cell args, cell env);
 cell import(cell args, cell env);
+cell lambda(cell args, cell env);
+cell macro(cell args, cell env);
+cell make_native_function(void* fn, bool with_env, bool hold_args);
+cell make_s64(int64_t x);
 cell native_function(cell args, cell env);
-int main(int argc, char** argv);
 cell parse(char** s);
+cell quote(cell args, cell env);
+cell same(cell args, cell env);
+cell str(cell args, cell env);
+cell sym(char* symbol);
+cell with(cell args, cell env);
+cell zip(cell args, cell env);
 char* print_cell(cell c);
 char* print_env(cell c);
-cell apply_ffi_function(int64_t (* fn)(), cell args);
-
