@@ -6,14 +6,6 @@ cell assoc_fn(cell args, cell env) {
     return assoc(key, dict);
 }
 
-cell apply_fn(cell args, cell env) {
-    if (!args) return NIL;
-    cell fn = car(args);
-    if (!IS_CALLABLE(fn)) return NIL;
-    if (!IS_PAIR(cdr(args))) args = NIL;
-    else args = cdar(args);
-    return apply(fn, args, env);
-}
 
 // Concatenate arguments
 cell concat_fn(cell args, cell env) {
