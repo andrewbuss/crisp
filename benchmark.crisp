@@ -2,7 +2,7 @@ import std
 
 ; https://en.wikipedia.org/wiki/Tak_(function)
 
-defrec tak (x y z) '(
+defrec tak (x y z) (
     if (not (asc y x))
         z
         (tak (tak (dec x) y z)
@@ -11,25 +11,23 @@ defrec tak (x y z) '(
 
 tak 24 16 8
 
-def identity lambda x x
-
 ; A CPS implementation of tak
 ; from http://svn.plt-scheme.org/plt/trunk/collects/tests/mzscheme/benchmarks/common/cpstack.sch
-defrec tak (x y z k) '(
+defrec tak (x y z k) (
     (if (not (asc y x))
         (k z)
         (tak (dec x)
              y
              z
-             (lambda (v1)
+             (lambda v1
                (tak (dec y)
                     z
                     x
-                    (lambda (v2)
+                    (lambda v2
                       (tak (dec z)
                            x
                            y
-                           (lambda (v3)
+                           (lambda v3
                                 (tak v1 v2 v3 k)))))))))
 
 tak 24 16 8 identity

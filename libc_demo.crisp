@@ -10,10 +10,9 @@ I rate this:
 void (libc.printf %d/%d 11 10) (libc.putchar 0xA)
 
 void (with buffer (libc.malloc 20)
-    map void (
-        (libc.sprintf buffer xXx%d%sxXx 0x539 CRISP)
-        (libc.puts buffer)
-        (libc.free buffer)))
+          (libc.sprintf buffer xXx%d%sxXx 0x539 CRISP)
+          (libc.puts buffer)
+          (libc.free buffer))
 
 Current user:
 void (libc.system whoami)
@@ -31,14 +30,25 @@ void (libc.system pwd)
     with lines (map getline (repeat infile 30))
 
     ; let's remove anything that's just a newline
-    def lines (filter (lambda line neq (libc.strlen line) 1) lines)
+    with lines (filter (lambda line neq (libc.strlen line) 1) lines)
+
+    ; how long is each line?
+    (with line_lens (map libc.strlen lines)
+
+        ; print out each line
+        (void (map libc.puts lines))
+
+        ; be a good citizen and free each buffer
+        (void (map libc.free lines))
+
+        (Line lengths: line_lens)
+    )
 )
 
-; print out each line
-void (map libc.puts lines)
 
-; how long is each line?
-Line lengths: (map libc.strlen lines)
 
-; be a good citizen and free each buffer
-void (map libc.free lines)
+
+
+
+
+

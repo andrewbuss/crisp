@@ -99,32 +99,32 @@ testwith test (a 1) (fail: a != 1)
 testwith test ((a a) (a a)) (pass: (a a) == (a a))
 
 ; boring recursive example
-defrec factorial x '(
+(
+    with factorial (rec factorial x
         if (equal x 0)
             1
             (product x (factorial (dec x))))
 
-test '(factorial 19) 121645100408832000
-
-
+    testwith factorial 19 121645100408832000
+)
 
 ; *exciting* and slow recursive example
-defrec fib x '(
-        if (asc x 2)
-            x
-            (sum (fib (dec x)) (fib (sum x -2))))
 
-test '(fib 10) 55
+(
+    with fib (rec fib x
+    if (asc x 2)
+        x
+        (sum (fib (dec x)) (fib (sum x -2))))
 
+    testwith fib 10 55
+)
 
-defrec fibpair x '(
+(
+    with fibpair (rec fibpair x
         if (asc x 2)
             (1 1)
             (apply (lambda (a b) b (sum a b))
-                   (fibpair (dec x))))fib
-
-; faster recursive example
-(
+                   (fibpair (dec x))))
     with fib (lambda z car (fibpair z))
     testwith fib 92 7540113804746346429
 )
@@ -139,13 +139,24 @@ test '((lambda x (x)) 1) 1
 test '((lambda (x y) x) 1 2) 1
 test '((lambda (x y) y) 1 2) 2
 
-test '((lambda (a b) (a b)) 1 2) (quote 1 2)
+test '((lambda (a b) (a b)) 1 2) (1 2)
 test '(car (cdr ((lambda (a b) a b) 1 2))) 2
 test '(car (cdr ((lambda (a b) (a b)) 1 2))) 2
-test '(car (cdr ((lambda (a b) list a b) 1 2))) 2
+
+test '((lambda (a b . rest) rest) 3 4 5 6 7) (5 6 7)
+test '((lambda (a b . rest) b a) 3 4 5 6 7) (4 3)
+
+test '(identity x) x
+test '(((curry sum) 4) 2) 6
+test '(map (papply sum 5) (-2 0 4)) (3 5 9)
+test '(((applyN uncurry 2) (lambda x lambda y lambda z sum x y z)) 1 2 3) 6
+test '((((applyN uncurry 1) (lambda x lambda y lambda z sum x y z)) 1 2) 3) 6
 
 ; filter out numbers less than 1
 test '(filter (lambda x (asc 0 x)) (4 -5 2 -67 0)) (4 2)
+
+; equivalently, with papply
+test '(filter (papply asc 0) (4 -5 2 -67 0)) (4 2)
 
 ; filtering an empty list yields an empty list
 test '(filter sum nil) nil
@@ -173,6 +184,7 @@ test '(repeat z 0) nil
 test '(repeat nil 2) (nil nil)
 
 test '(zip (a b c) (1 2 3)) ((a . 1) (b . 2) (c . 3))
+test '(zip (a b) (1 2 3 4)) ((a . 1) (b . 2))
 
 test '(void (sum 1 2 3)) nil
 

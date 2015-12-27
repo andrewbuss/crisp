@@ -1,5 +1,4 @@
 def assoc native-function this.assoc_fn
-def apply native-function this.apply_fn
 def concat native-function this.concat_fn
 def asc native-function this.asc
 def sum native-function this.sum
@@ -15,35 +14,143 @@ def nil
 def not lambda a if a nil true
 
 ; if a and b are non-nil, return b
-def and lambda (a b) if a b nil
-def nand lambda (a b) not (and a b)
+def and macro (AND_A AND_B) if (eval AND_A) (eval AND_B) nil
 
 ; return a if either a or b are non-nil
-def or lambda (a b) if a a b
+def or macro (AND_A AND_B) with AND_A (eval AND_A) if AND_A AND_A eval AND_B
+
+def nand lambda (a b) not (and a b)
+
 def nor lambda (a b) not (or a b)
 def neq lambda (a b) not (equal a b)
 
-def dec lambda x (sum x -1)
-def inc lambda x (sum x 1)
-def neg lambda x (product x -1)
-def sub lambda (a b) (sum a (neg b))
+def dec lambda x sum x -1
+def inc lambda x sum x 1
+def neg lambda x product x -1
+def sub lambda (a b) sum a (neg b)
+
+def caar lambda x car (car x)
+def cddr lambda x cdr (cdr x)
+def cdar lambda x car (cdr x)
+def cadr lambda x cdr (car x)
+def cddar lambda x car (cddr x)
+def cdddr lambda x cdr (cddr x)
+def cdddar lambda x car (cdddr x)
 
 ; evaluate arguments and return NIL
 ; useful for functions with side-effects
 def void lambda _
+
+; some higher-order functions
+def identity lambda x x
+def papply lambda (f first) lambda (() . rest) apply f (cons first rest)
+def curry lambda f lambda first lambda (() . rest) apply f (cons first rest)
+def uncurry lambda f lambda (x y) (f x) y
 
 ; the Y combinator
 def makerec lambda f (
     (lambda x x x)
     (lambda x f (lambda y (x x) y)))
 
-def defrec lambda (name args body) (
-    with inner (eval lambda args body)
-    with outer (eval lambda name inner)
-    eval def name makerec outer)
+; make a recursive function of one or two variables
+; we'll use these to build a macro to take any number of args
+def rec1 macro (f-name f-arg . f-def) makerec (eval lambda f-name lambda f-arg f-def)
+def rec2 macro (f-name f-args . f-def) (
+    uncurry (makerec (eval lambda f-recursive   ; the new function takes itself as an argument
+                           lambda (car f-args)  ; first formal parameter
+                           lambda (cdar f-args) ; second formal parameter
+                            ; uncurry ourselves so we can recurse normally
+                           with f-name '(uncurry f-recursive) f-def)))
+
+def defrec1 macro (f-name f-arg . f-def) eval def f-name rec1 f-name f-arg f-def
+def defrec2 macro (f-name f-args . f-def) eval def f-name rec2 f-name f-args f-def
+
+; return the length of a list l
+defrec1 len l if l (inc (len (cdr l))) 0
+
+; swap the car and cdr at every level of a list
+defrec1 recursive-swap l (
+    if (not (ispair l)) l cons (recursive-swap (cdr l)) (recursive-swap (car l)))
+
+; concatenate the reverse of l with r
+defrec2 reverse-concat (l r) (
+    if l
+        (reverse-concat (cdr l) (cons (car l) r))
+        r)
+
+; return l in reverse order
+def reverse lambda l reverse-concat l nil
+
+; apply fn to each element of l
+defrec2 map (fn l) (if (ispair l) (cons (fn (car l)) (map fn (cdr l))))
+
+; return a list with val repeated count times
+defrec2 repeat (val count) (if (equal count 0) () cons val (repeat val (dec count)))
+
+; return a list of pairs containing corresponding items from l and r
+defrec2 zip (l r) (
+    if (and l r) (
+        cons (cons (car l) (car r))
+             (zip (cdr l) (cdr r))))
+
+; return a list with the last element of l at the head of a list containing
+; the other elements of l
+defrec1 rotate-right l (
+    if (not (cdr l)) l
+    with result (rotate-right (cdr l))
+    with last (car result)
+    with rest (cdr result)
+    cons last (cons (car l) rest))
+
+; return a function which applies fn n times to its argument
+defrec2 applyN (fn n) (
+    if (equal n 0) identity
+    lambda (() . rest)
+    (apply fn (apply (applyN fn (dec n)) rest)))
+
+; convert a curried function into one that takes multiple arguments
+; e.g. ((f 1) 2) 3 == ((uncurry f) 1 2) 3
+def uncurry lambda f (
+    lambda (() . rest)
+    if (not rest) f
+    with rest (rotate-right rest)
+    (apply f (cdr rest)) (car rest))
+
+; given two lists (a b c) (x y z), interleave them to produce a x b y c z
+defrec2 riffle (a b) apply concat (map (lambda p (car p) (cdr p)) (zip a b))
+
+; construct a recursive function of an arbitrary but fixed number of arguments
+def rec macro (f-name f-args . f-def) (
+    ; We can only use withrec on a curried function, so we must first convert the
+    ; function from (lambda (x y z) ...) to (lambda x lambda y lambda z ...), then
+    ; wrap this in another lambda to accept itself as a parameter
+
+    with num-args (len f-args)
+
+    ; we'll use this to uncurry the function before passing it to itself,
+    ; and to uncurry the function we finally yield
+    ; we uncurry (dec num-args) times because if the function takes only a single
+    ; argument, there's no need to uncurry
+    with uncurrier (applyN uncurry (dec num-args))
+
+    ; generate (lambda f-recursive lambda a lambda b ... lambda z)
+    with args-curried (riffle (repeat 'lambda (inc num-args)) (concat f-recursive f-args))
+
+    ; tricky quotes to hold evaluation of the uncurrier until f-recursive is in scope
+    with f-def (concat ('with f-name ('uncurrier 'f-recursive)) f-def)
+    with f-def (concat args-curried (f-def))
+
+    ; uncurry ourselves so we can recurse normally
+    with f-curried (eval f-def)
+
+    ; uncurry ourselves so we can call this normally
+    uncurrier (makerec f-curried))
+
+; at last we have a means of recursion for functions of arbitrary
+def defrec macro (f-name f-args . f-def) eval def f-name rec f-name f-args f-def
 
 void (
-    with list-equal (lambda (a b)
+    with list-equal (rec list-equal (a b)
         if (nor a b)                         ; if both are nil, these are equal
             true
         if (and a b) (                       ; but either is nil, they are not
@@ -67,21 +174,16 @@ void (
     (def list-equal list-equal)
 )
 
-def caar lambda x car (car x)
-def cddr lambda x cdr (cdr x)
-def cdar lambda x car (cdr x)
-def cadr lambda x cdr (car x)
-
 ; (reduce f (1 2 3) init) is equivalent to (f 1 (f 2 (f 3 init)))
-def reduce lambda (fn list init) (
+defrec reduce (fn list init) (
     if (not list)
         init
     fn (car list) (reduce fn (cdr list) init))
 
 ; (map f (1 2 3)) is equivalent to (f 1) (f 2) (f 3)
-def map lambda (fn list) (
+defrec map (fn list) (
     if list
-        (cons (fn (car list)) (map fn (cdr list))))
+       (cons (fn (car list)) (map fn (cdr list))))
 
 ; is the entire list non-nil?
 def all lambda list reduce and list true
@@ -94,41 +196,19 @@ def none lambda list not (any list)
 
 ; yield a list containing each element i of l
 ; such that (f i) is non-nil
-def filter lambda (f l) (
+defrec filter (f l) (
     if l (
         if (f (car l))
             (cons (car l) (filter f (cdr l)))
         filter f (cdr l))
 )
 
-; concatenate the reverse of l with r
-def reverse-concat lambda (l r) (
-    if (not l)
-        r
-    reverse-concat (cdr l) (cons (car l) r))
-
-; return l in reverse order
-def reverse lambda l reverse-concat l nil
-
 def >= lambda (a b) or (equal a b) (asc b a)
-def reversed-range lambda end (
+
+defrec reversed-range (end) (
     if (>= end 0)
         (cons end (reversed-range (dec end))))
 
 ; return 0 to end, right-exclusive
 def range lambda end reverse (reversed-range (dec end))
 
-def repeat lambda (val count) (
-    if (asc count 1)
-        nil
-    cons val (repeat val (dec count)))
-
-
-def zip lambda (l r) (
-    if (and l r) (
-        cons (cons (car l) (car r))
-             (zip (cdr l) (cdr r))))
-
-def len lambda l (
-    if l (inc (len (cdr l)))
-    0)
