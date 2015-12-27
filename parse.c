@@ -34,7 +34,7 @@ cell parse(char** s) {
             if (!IS_PAIR(car(rest))) return cons(LIST2(sym("quote"), car(rest)), cdr(rest));
 
             // '(a b c) -> (quote a b c)
-            return cons(cons(sym("quote"), car(rest)), cdr(rest));
+            return cons(cons(sym("quote"), rest), cdr(rest));
         }
         case '.': {
             (*s)++;
@@ -115,8 +115,12 @@ static int print(cell c) {
             return catf("FFI_FUNCTION<%p>", PTR(c));
         case FFI_LIBRARY:
             return catf("FFI_LIBRARY<%p>", PTR(c));
+        case MACRO:
+            catf("(macro (");
+            goto print_args_body;
         case LAMBDA:
             catf("(lambda (");
+        print_args_body:
             print(((lambda_t*)PTR(c))->args);
             catf(") ");
             print(((lambda_t*)PTR(c))->body);
@@ -146,8 +150,8 @@ char* print_env(cell c) {
         if (!IS_PAIR(car(c))) break;
         if (TYPE(caar(c)) != SYMBOL) break;
         if (!strcmp(SYM_STR(caar(c)), "GLOBALS")) break;
-        catf("\n");
-        print(car(c));
+        catf("\n%20s . ", SYM_STR(caar(c)));
+        print(cadr(c));
         c = cdr(c);
     }
     catf(")");
@@ -179,10 +183,10 @@ bool logical_line_ingest(logical_line* line, char c) {
             line->in_comment = true;
             return false;
         case '(':
-            line->parens++;
+            if(!line->in_comment) line->parens++;
             break;
         case ')':
-            line->parens--;
+            if(!line->in_comment) line->parens--;
             break;
         default:
             break;
