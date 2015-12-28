@@ -13,11 +13,11 @@ def nil
 ; the opposite of nil is true
 def not lambda a if a nil true
 
-; if a and b are non-nil, return b
-def and macro (AND_A AND_B) if (eval AND_A) (eval AND_B) nil
+; if a is non-nil return b
+def and lambda (a b) if a b nil
 
-; return a if either a or b are non-nil
-def or macro (AND_A AND_B) with AND_A (eval AND_A) if AND_A AND_A eval AND_B
+; return a if a is non-nil, otherwise b
+def or lambda (a b) if a a b
 
 def nand lambda (a b) not (and a b)
 
@@ -39,11 +39,11 @@ def cdddar lambda x car (cdddr x)
 
 ; evaluate arguments and return NIL
 ; useful for functions with side-effects
-def void lambda _
+def void macro (() . body) and (eval body) nil
 
 ; some higher-order functions
 def identity lambda x x
-def papply lambda (f first) lambda (() . rest) apply f (cons first rest)
+def papply lambda (f . first) lambda (() . rest) apply f (concat first rest)
 def curry lambda f lambda first lambda (() . rest) apply f (cons first rest)
 def uncurry lambda f lambda (x y) (f x) y
 
@@ -82,7 +82,7 @@ defrec2 reverse-concat (l r) (
 def reverse lambda l reverse-concat l nil
 
 ; apply fn to each element of l
-defrec2 map (fn l) (if (ispair l) (cons (fn (car l)) (map fn (cdr l))))
+defrec2 map (fn l) (if l (cons (fn (car l)) (map fn (cdr l))))
 
 ; return a list with val repeated count times
 defrec2 repeat (val count) (if (equal count 0) () cons val (repeat val (dec count)))
@@ -174,34 +174,47 @@ void (
     (def list-equal list-equal)
 )
 
-; (reduce f (1 2 3) init) is equivalent to (f 1 (f 2 (f 3 init)))
-defrec reduce (fn list init) (
-    if (not list)
+; (foldr f init (1 2 3)) is equivalent to (f 1 (f 2 (f 3 init)))
+defrec foldr (fn init l) (
+    if (not l)
         init
-    fn (car list) (reduce fn (cdr list) init))
+    fn (car l) (foldr fn init (cdr l)))
 
-; (map f (1 2 3)) is equivalent to (f 1) (f 2) (f 3)
-defrec map (fn list) (
-    if list
-       (cons (fn (car list)) (map fn (cdr list))))
+; (foldr f init (1 2 3)) is equivalent to (f (f (f init 1) 2) 3)
+defrec foldl (fn rest l) (
+    if (not l)
+        rest
+    foldl fn (fn rest (car l)) (cdr l))
+
+def reduce lambda (fn l) (
+    if (not (ispair l))
+        l
+    if (not (cdr l))
+        (car l)
+    with first (fn (car l) (cdar l))
+    foldl fn first (cddr l))
+
+; foldl applies fn in the correct order but returns the result reversed
+; so we reverse it before returning
+def map    lambda (fn l) reverse (foldl (lambda (a b) cons (fn b) a) nil l)
+def filter lambda (fn l) foldr (lambda (a b) if (fn a) (cons a b) b) nil l
 
 ; is the entire list non-nil?
-def all lambda list reduce and list true
+def all (papply reduce and)
 
 ; is at least one element non-nil?
-def any lambda list reduce or list nil
+def any (papply reduce or)
 
 ; are all elements nil?
 def none lambda list not (any list)
 
+defrec unzip (l) (
+    if (not l) nil
+    with rest (unzip (cdr l))
+    (cons (caar l) (car rest)) (cons (cadr l) (cdar rest)))
+
 ; yield a list containing each element i of l
 ; such that (f i) is non-nil
-defrec filter (f l) (
-    if l (
-        if (f (car l))
-            (cons (car l) (filter f (cdr l)))
-        filter f (cdr l))
-)
 
 def >= lambda (a b) or (equal a b) (asc b a)
 
