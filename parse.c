@@ -107,9 +107,8 @@ static int print(cell c) {
         case SYMBOL:
             return catf("%s", SYM_STR(c));
         case NATIVE_FN:
-        case NATIVE_FN_ENV:
+        case NATIVE_FN_TAILCALL:
         case NATIVE_FN_HELD_ARGS:
-        case NATIVE_FN_ENV_HELD_ARGS:
             return catf("NATIVE_FUNCTION<%p>", PTR(c));
         case FFI_FUNCTION:
             return catf("FFI_FUNCTION<%p>", PTR(c));
@@ -125,6 +124,8 @@ static int print(cell c) {
             catf(") ");
             print(((lambda_t*)PTR(c))->body);
             return catf(")");
+        case CONS:
+            return catf("CONS");
         case NIL:
             return catf("()");
         default:

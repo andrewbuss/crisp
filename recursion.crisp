@@ -1,6 +1,10 @@
-def stackkill lambda x (
-    if (equal x 0)
-        0
-    stackkill (sum x -1))
+import std
 
-stackkill 20000
+; This function overflows the stack of the interpreter without tail-call optimization modulo cons
+; It does not overflow the stack of crisp :)
+
+defrec stackkill (a b) (
+    if (equal a 0) (cons a b)
+    cons (a . b) stackkill (dec a) (inc b))
+
+stackkill 10000 10000

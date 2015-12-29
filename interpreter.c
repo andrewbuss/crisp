@@ -10,26 +10,27 @@ int main(int argc, char** argv) {
 
     stack_base = &argc;
 
-    global_env = cons(cons(sym("if"), make_native_function(if_fn, true, true)), global_env);
-    global_env = cons(cons(sym("eval"), make_native_function(eval, true, false)), global_env);
-    global_env = cons(cons(sym("quote"), make_native_function(quote, false, true)), global_env);
-    global_env = cons(cons(sym("lambda"), make_native_function(lambda, true, true)), global_env);
-    global_env = cons(cons(sym("car"), make_native_function(car_fn, false, false)), global_env);
-    global_env = cons(cons(sym("cdr"), make_native_function(cdr_fn, false, false)), global_env);
-    global_env = cons(cons(sym("cons"), make_native_function(cons_fn, false, false)), global_env);
-    global_env = cons(cons(sym("list"), make_native_function(quote, false, false)), global_env);
-    global_env = cons(cons(sym("equal"), make_native_function(equal_fn, false, false)), global_env);
-    global_env = cons(cons(sym("same"), make_native_function(same, false, false)), global_env);
-    global_env = cons(cons(sym("def"), make_native_function(def, true, true)), global_env);
-    global_env = cons(cons(sym("with"), make_native_function(with, true, true)), global_env);
-    global_env = cons(cons(sym("macro"), make_native_function(macro, true, true)), global_env);
-    global_env = cons(cons(sym("apply"), make_native_function(apply_fn, true, false)), global_env);
+
+    global_env = cons(cons(sym("eval"), CAST(eval, NATIVE_FN)), global_env);
+    global_env = cons(cons(sym("quote"), CAST(quote, NATIVE_FN_HELD_ARGS)), global_env);
+    global_env = cons(cons(sym("lambda"), CAST(lambda, NATIVE_FN_HELD_ARGS)), global_env);
+    global_env = cons(cons(sym("car"), CAST(car_fn, NATIVE_FN)), global_env);
+    global_env = cons(cons(sym("cdr"), CAST(cdr_fn, NATIVE_FN)), global_env);
+    global_env = cons(cons(sym("list"), CAST(quote, NATIVE_FN)), global_env);
+    global_env = cons(cons(sym("equal"), CAST(equal_fn, NATIVE_FN)), global_env);
+    global_env = cons(cons(sym("same"), CAST(same, NATIVE_FN)), global_env);
+    global_env = cons(cons(sym("def"), CAST(def, NATIVE_FN_HELD_ARGS)), global_env);
+    global_env = cons(cons(sym("macro"), CAST(macro, NATIVE_FN_HELD_ARGS)), global_env);
 
 #ifndef DISABLE_FFI
-    global_env = cons(cons(sym("dlopen"), make_native_function(dlopen_fn, false, false)), global_env);
-    global_env = cons(cons(sym("dlsym"), make_native_function(dlsym_fn, false, false)), global_env);
-    global_env = cons(cons(sym("import"), make_native_function(import, true, false)), global_env);
+    global_env = cons(cons(sym("dlopen"), CAST(dlopen_fn, NATIVE_FN)), global_env);
+    global_env = cons(cons(sym("dlsym"), CAST(dlsym_fn, NATIVE_FN)), global_env);
+    global_env = cons(cons(sym("import"), CAST(import, NATIVE_FN)), global_env);
 #endif
+    global_env = cons(cons(sym("apply"), CAST(apply_fn, NATIVE_FN_TAILCALL)), global_env);
+    global_env = cons(cons(sym("if"), CAST(if_fn, NATIVE_FN_TAILCALL)), global_env);
+    global_env = cons(cons(sym("with"), CAST(with, NATIVE_FN_TAILCALL)), global_env);
+    global_env = cons(cons(sym("cons"), CAST(NIL, CONS)), global_env);
 
     global_env = cons(cons(sym("GLOBALS"), NIL), global_env);
 
@@ -54,7 +55,7 @@ int main(int argc, char** argv) {
             return 0;
         char* i = line;
         while (*i) {
-            if (!logical_line_ingest(&ll, *i++)){
+            if (!logical_line_ingest(&ll, *i++)) {
                 if (ll.parens < 0) {
                     reset_logical_line(&ll);
                     break;

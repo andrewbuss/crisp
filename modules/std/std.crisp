@@ -106,7 +106,10 @@ defrec1 rotate-right l (
 defrec2 applyN (fn n) (
     if (equal n 0) identity
     lambda (() . rest)
-    (apply fn (apply (applyN fn (dec n)) rest)))
+    apply fn (apply (applyN fn (dec n)) rest))
+
+; given two lists (a b c) (x y z), interleave them to produce a x b y c z
+def riffle lambda (a b) apply concat (map (lambda p (car p) (cdr p)) (zip a b))
 
 ; convert a curried function into one that takes multiple arguments
 ; e.g. ((f 1) 2) 3 == ((uncurry f) 1 2) 3
@@ -115,9 +118,6 @@ def uncurry lambda f (
     if (not rest) f
     with rest (rotate-right rest)
     (apply f (cdr rest)) (car rest))
-
-; given two lists (a b c) (x y z), interleave them to produce a x b y c z
-defrec2 riffle (a b) apply concat (map (lambda p (car p) (cdr p)) (zip a b))
 
 ; construct a recursive function of an arbitrary but fixed number of arguments
 def rec macro (f-name f-args . f-def) (

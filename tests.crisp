@@ -13,6 +13,14 @@ test 'a a
 test '(1 . 1) (1 . 1)
 test '(a . (b . (c . nil))) (a b c)
 
+; cons evaluates its left argument immediately, then
+; evaluates its right argument in the same stack frame,
+; eventually storing it in the right slot of the topmost
+; pair when evaluation returns. This is merely an implementation
+; optimization and shouldn't affect behavior
+test '(cons a cons b cons c) (a b c)
+test '(apply cons (a b)) (a . b)
+
 ; The quote function returns its arguments (a list) unevaluated
 ; 'cdr is syntactic sugar for (quote cdr)
 test '(quote cdr) 'cdr

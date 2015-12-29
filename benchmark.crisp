@@ -1,33 +1,94 @@
 import std
 
-; https://en.wikipedia.org/wiki/Tak_(function)
+; This function times evaluation of a piece of code using libc's clock() function
+with libc (dlopen libc.so.6) void (
+    def benchmark lambda code
+        with start-time (libc.clock ())
+        with result     (eval code)
+        with end-time   (libc.clock ())
+        (void libc.printf %9dus (sub end-time start-time)) code)
 
-defrec tak (x y z) (
+; The simplest case of recursion: recurse-global is defined globally
+; so no combinator tricks are required to call this function inside itself
+def recurse-global lambda x (
+    if (equal x 0) done
+    recurse-global (dec x))
+
+benchmark '(recurse-global 100000)
+
+; This function achieves recursion via a macro using the Y combinator
+; This is a function of a single argument so no currying or uncurrying is required
+defrec recurse-pure x (
+    if (equal x 0) done
+    recurse-pure (dec x))
+
+benchmark '(recurse-pure 100000)
+
+; This function takes 3 arguments but should be just
+; as fast as the unary recurse-global
+def recurse-global lambda (a b c) (
+    if (equal a 0) done
+    recurse-global (dec a))
+
+benchmark '(recurse-global 100000 10 10)
+
+; Unfortunately, uncurrying and currying suffer o(n^2) runtime in the number of arguments
+; A function leveraging the global environment for recursion does not have this overhead,
+; but a pure recursive function quickly becomes slow as the number of arguments increases
+defrec recurse-pure (a b c) (
+    if (equal a 0) bottom
+    recurse-pure (dec a) b c)
+
+; Note that we test with only 2000 recursive invocations yet achieve approximately the same
+; runtime as the previous benchmarks. This ternary function is about 25 times slower than
+; the pure unary function
+benchmark '(recurse-pure 2000 10 10)
+
+; The pure six-argument function is very slow
+defrec recurse-pure (a b c d e f) (
+    if (equal a 0) bottom
+    recurse-pure (dec a) b c d e f)
+benchmark '(recurse-pure 2000 10 10 10 10 10)
+
+; The ten-argument function is even slower
+defrec recurse-pure (a b c d e f g h i j) (
+    if (equal a 0) bottom
+    recurse-pure (dec a) b c d e f g h i j)
+benchmark '(recurse-pure 2000 10 10 10 10 10 10 10 10 10)
+
+; But a ten-argument global function is just as fast as before
+def recurse-global lambda (a b c d e f g h i j) (
+    if (equal a 0) done
+    recurse-global (dec a) b c d e f g h i j)
+benchmark '(recurse-global 100000 10 10 10 10 10 10 10 10 10)
+
+; https://en.wikipedia.org/wiki/Tak_(function)
+def tak lambda (x y z) (
     if (not (asc y x))
         z
         (tak (tak (dec x) y z)
              (tak (dec y) z x)
              (tak (dec z) x y)))
 
-tak 24 16 8
+benchmark '(tak 24 16 8)
 
 ; A CPS implementation of tak
 ; from http://svn.plt-scheme.org/plt/trunk/collects/tests/mzscheme/benchmarks/common/cpstack.sch
-defrec tak (x y z k) (
-    (if (not (asc y x))
+def tak lambda (x y z k) (
+    if (not (asc y x))
         (k z)
-        (tak (dec x)
+        tak (dec x)
              y
              z
              (lambda v1
-               (tak (dec y)
+               tak (dec y)
                     z
                     x
                     (lambda v2
-                      (tak (dec z)
+                      tak (dec z)
                            x
                            y
                            (lambda v3
-                                (tak v1 v2 v3 k)))))))))
+                                tak v1 v2 v3 k))))
 
-tak 24 16 8 identity
+benchmark '(tak 24 16 8 identity)

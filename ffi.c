@@ -125,7 +125,7 @@ cell import(cell args, cell env) {
 
     cell this_lib = (cell) handle | FFI_LIBRARY;
     cell mapping_this_lib = cons(sym("this"), this_lib);
-    cell mapping_native_function = cons(sym("native-function"), make_native_function(native_function, false, false));
+    cell mapping_native_function = cons(sym("native-function"), CAST(native_function, NATIVE_FN));
     cell new_env = cons(mapping_this_lib, env);
     new_env = cons(mapping_native_function, new_env);
     logical_line ll;
