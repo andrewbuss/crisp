@@ -1,6 +1,8 @@
 import std
 
-; This function overflows the stack of the interpreter without tail-call optimization modulo cons
+; This function overflows the stack of an interpreter without
+; optimization of tail recursion modulo cons
+
 ; It does not overflow the stack of crisp :)
 
 defrec stackkill (a b) (

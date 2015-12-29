@@ -1,4 +1,4 @@
-crisp: the simplest C Lisp that could possibly work
+crisp: a purely functional language interpreter bolted to a very unsafe FFI
 
 Repo contents:
 
@@ -165,10 +165,11 @@ Evaluation notes:
 
 Implementation notes:
 
-    For simplicity we avoid iterative "fast-paths", preferring instead to use
-    lispish primitives, even in C. For example, the C assoc implementation is
-    recursive even though it could be implemented iteratively instead, likely
-    yielding better performance.
+    At one point crisp was implemented in a purely functional style
+    (as far as that's possible in C). Later work, particularly work on
+    optimizing tail calls, has added enough complex control flow that this
+    is no longer really true, but the goal of moving as much functionality
+    from the interpreter into the language remains.
 
     There is no special "environment" struct. The environment is a normal list
     containing dotted-pair mappings between variable names and their values.
@@ -176,8 +177,9 @@ Implementation notes:
     to the previous environment.
 
     The intention is to implement only the minimum functionality in C required
-    to implement higher-level functionality in the crisp language, such as map,
-    filter, defrec, and, via the FFI, libc, and glib, I/O of some sort.
+    to implement higher-level functionality in the crisp language, such as
+    recursion, map, filter, defrec, and, via the FFI, libc, and glib, I/O of
+    some sort.
 
     At present, crisp uses the Boehm-Demers-Weiser (http://www.hboehm.info/gc/)
     garbage collector rather than including one of its own. A reference counted
@@ -187,10 +189,7 @@ Implementation notes:
     many other projects with very little extra C code in crisp. Using libc from
     crisp allows all sorts of low-level I/O. 
 
-    When a symbol is parsed, we search for it in a global list of symbols. If
-    it exists, we return the existing symbol; otherwise it is added to the
-    list. This way, we can quickly comparse symbols by their addresses without
-    a call to strcmp.
+    Symbols are interned when they are parsed.
 
 Fuzzing:
 
