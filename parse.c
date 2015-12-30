@@ -107,22 +107,22 @@ static int print(cell c) {
         case SYMBOL:
             return catf("%s", SYM_STR(c));
         case NATIVE_FN:
-        case NATIVE_FN_TAILCALL:
-        case NATIVE_FN_HELD_ARGS:
+        case NATIVE_FN_TCO:
+        case NATIVE_MACRO:
             return catf("NATIVE_FUNCTION<%p>", PTR(c));
-        case FFI_FUNCTION:
-            return catf("FFI_FUNCTION<%p>", PTR(c));
+        case FFI_FN:
+            return catf("FFI_FN<%p>", PTR(c));
         case FFI_LIBRARY:
             return catf("FFI_LIBRARY<%p>", PTR(c));
         case MACRO:
             catf("(macro (");
             goto print_args_body;
-        case LAMBDA:
+        case FN:
             catf("(lambda (");
         print_args_body:
-            print(((lambda_t*)PTR(c))->args);
+            print(((fn_t*)PTR(c))->args);
             catf(") ");
-            print(((lambda_t*)PTR(c))->body);
+            print(((fn_t*)PTR(c))->body);
             return catf(")");
         case CONS:
             return catf("CONS");

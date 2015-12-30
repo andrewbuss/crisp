@@ -19,23 +19,23 @@ void* malloc_or_die(size_t size) {
 cell make_s64(int64_t x) {
     cell rv = (cell) malloc_or_die(8);
     *(int64_t*) rv = x;
-    return rv | S64;
+    return CAST(rv, S64);
 }
 
 cell cons(cell car, cell cdr) {
     cell c = (cell) malloc_or_die(16);
     ((pair*) c)->car = car;
     ((pair*) c)->cdr = cdr;
-    return c | PAIR;
+    return CAST(c, PAIR);
 }
 
-cell make_lambda(cell args, cell body, cell env) {
+cell make_fn(cell args, cell body, cell env) {
     DPRINTF("\x1b[33m" "Making lambda %s = %s in %s\n" "\x1b[0m", print_cell(args), print_cell(body), print_env(env));
-    cell c = (cell) malloc_or_die(sizeof(lambda_t));
-    ((lambda_t*) c)->args = args;
-    ((lambda_t*) c)->body = body;
-    ((lambda_t*) c)->env = env;
-    return c | LAMBDA;
+    cell c = (cell) malloc_or_die(sizeof(fn_t));
+    ((fn_t*) c)->args = args;
+    ((fn_t*) c)->body = body;
+    ((fn_t*) c)->env = env;
+    return CAST(c, FN);
 }
 
 cell lambda(cell args, cell env) {
@@ -43,7 +43,7 @@ cell lambda(cell args, cell env) {
     cell body = cdr(args);
     args = car(args);
     if (!IS_PAIR(args)) args = LIST1(args);
-    return make_lambda(args, body, env);
+    return make_fn(args, body, env);
 }
 
 // A macro is identical to a lambda except that args are left
@@ -63,8 +63,8 @@ cell sym_dedupe(cell list, char* symbol) {
 // Create a new symbol from the passed string
 // If the symbol already exists, return the already created one
 cell sym(char* symbol) {
-    cell deduped = sym_dedupe(sym_list, symbol);
-    if (deduped) return deduped;
+    cell interned = sym_dedupe(sym_list, symbol);
+    if (interned) return interned;
     sym_list = cons(CAST(strdup(symbol), SYMBOL), sym_list);
     return car(sym_list);
 }
@@ -190,12 +190,12 @@ cell assoc(cell key, cell dict) {
 bool apply(cell fn, cell* args, cell* env) {
     DPRINTF("\x1b[32m" "Applying %s\n      to %s\n" "\x1b[0m", print_cell(fn), print_cell(*args));
     switch ((uint64_t) TYPE(fn)) {
-        case LAMBDA:
+        case FN:
         case MACRO: {
             // For lambdas and macros we simply "slide" the evaluation
             // sideways into the body of the lambda, adding some new
             // definitions to the environment
-            lambda_t* l = (lambda_t*) PTR(fn);
+            fn_t* l = (fn_t*) PTR(fn);
             cell new_env;
             // If our arguments of the form () . rest, we just
             // set up the single argument
@@ -210,12 +210,12 @@ bool apply(cell fn, cell* args, cell* env) {
             // Update the evaluation context and environment
             TC_SLIDE(l->body);
         }
-        case NATIVE_FN_TAILCALL:
+        case NATIVE_FN_TCO:
             // The function we are calling can itself potentially invoke a
             // tail call, so just passb in a pointer to the evaluation context
             return (bool) FN_PTR(fn)(args, env);
         case NATIVE_FN:
-        case NATIVE_FN_HELD_ARGS:
+        case NATIVE_MACRO:
             // We can't make any assumptions about the native function, so
             // evaluate it normally in a new stack frame
             TC_RETURN(FN_PTR(fn)(*args, *env));
@@ -227,8 +227,8 @@ bool apply(cell fn, cell* args, cell* env) {
             // through apply_fn
             TC_RETURN(cons_fn(*args, NIL));
 #ifndef DISABLE_FFI
-        case FFI_FUNCTION:
-            TC_RETURN(apply_ffi_function(FFI_FN(fn), *args));
+        case FFI_FN:
+            TC_RETURN(apply_ffi_function(FFI_FN_PTR(fn), *args));
 #endif
         default:
             puts("Tried to evaluate something uncallable");
@@ -305,7 +305,7 @@ cell eval(cell c, cell env) {
 
     // TCO notes:
     // As far as possible, we try to avoid calling eval from eval.
-    // For basic tail call optimization, crisp supports a type NATIVE_FN_TAILCALL
+    // For basic tail call optimization, crisp supports a type NATIVE_FN_TCO
     // Functions of this type accept references to their args and to the environment
     // and return true or false.
 
@@ -386,8 +386,8 @@ cell eval(cell c, cell env) {
                 switch (TYPE(fn)) {
                     // These types expect their arguments to be evaluated first
                     case NATIVE_FN:
-                    case LAMBDA:
-                    case FFI_FUNCTION:
+                    case FN:
+                    case FFI_FN:
                         c = evalmap(c, env);
                     default:
                         break;

@@ -32,7 +32,7 @@ cell find_ffi_function(char* sym_name, cell env) {
 }
 
 // Try to resolve a symbol in a specific shared library
-// dlsym (dlopen libc.so.6) puts -> FFI_FUNCTION<...>
+// dlsym (dlopen libc.so.6) puts -> FFI_FN<...>
 cell dlsym_fn(cell args, cell env) {
     if (!args || TYPE(car(args)) != FFI_LIBRARY || !IS_PAIR(cdr(args)))
         return NIL;
@@ -41,7 +41,7 @@ cell dlsym_fn(cell args, cell env) {
     void* sym = dlsym((void*) PTR(car(args)), SYM_STR(cdar(args)));
 
     if (!sym) return NIL;
-    return (cell) sym | FFI_FUNCTION;
+    return (cell) sym | FFI_FN;
 }
 
 // Open a shared library by name
@@ -52,20 +52,20 @@ cell dlopen_fn(cell args, cell env) {
     return (cell) handle | FFI_LIBRARY;
 }
 
-// Apply an FFI_FUNCTION to up to 5 arguments
+// Apply an FFI_FN to up to 5 arguments
 // Symbols are passed as strings, S64's are passed as longs
 cell apply_ffi_function(int64_t (* fn)(), cell args) {
     // Hardcode cases for up to 5 args
-    void* ffi_args[5];
+    void* ffi_args[6];
     int i = 0;
 
-    for (; IS_PAIR(args) && i < 5; args = cdr(args), i++) {
+    for (; IS_PAIR(args) && i < 6; args = cdr(args), i++) {
         cell arg = car(args);
         if (TYPE(arg) == SYMBOL)
             ffi_args[i] = SYM_STR(arg);
         else if (TYPE(arg) == S64)
             ffi_args[i] = (void*) S64_VAL(arg);
-        else if (TYPE(arg) == FFI_FUNCTION)
+        else if (TYPE(arg) == FFI_FN)
             ffi_args[i] = (void*) PTR(arg);
         else
             ffi_args[i] = NULL;
@@ -82,8 +82,10 @@ cell apply_ffi_function(int64_t (* fn)(), cell args) {
         case 4:
             return make_s64(fn(ffi_args[0], ffi_args[1], ffi_args[2], ffi_args[3]));
         case 5:
-        default:
             return make_s64(fn(ffi_args[0], ffi_args[1], ffi_args[2], ffi_args[3], ffi_args[4]));
+        case 6:
+        default:
+            return make_s64(fn(ffi_args[0], ffi_args[1], ffi_args[2], ffi_args[3], ffi_args[4], ffi_args[5]));
     }
 }
 
@@ -104,10 +106,20 @@ void* try_load(char* filename, bool* already_loaded) {
     return NULL;
 }
 
+
+cell native_fn(cell args, cell env) {
+    if (!args) return NIL;
+    return CAST(car(args), NATIVE_FN);
+}
+
+cell native_macro(cell args, cell env) {
+    if (!args) return NIL;
+    return CAST(car(args), NATIVE_MACRO);
+}
+
 cell import(cell args, cell env) {
     if (!args || TYPE(car(args)) != SYMBOL) return NIL;
     char* lib_name = SYM_STR(car(args));
-
     char* lib_filename = NULL;
     void* handle;
     char* module_path = getenv("CRISP_MODULE_PATH");
@@ -128,6 +140,10 @@ cell import(cell args, cell env) {
     free(module_path);
     if (!handle) return NIL;
 
+    for (char* i = lib_name; *i; i++) {
+        if (*i == '-') *i = '_';
+    }
+
     char* sym_name = NULL;
     asprintf(&sym_name, "_binary_%s_crisp_start", lib_name);
     char* script = dlsym(handle, sym_name);
@@ -140,9 +156,10 @@ cell import(cell args, cell env) {
 
     cell this_lib = (cell) handle | FFI_LIBRARY;
     cell mapping_this_lib = cons(sym("this"), this_lib);
-    cell mapping_native_function = cons(sym("native-function"), CAST(native_function, NATIVE_FN));
+    cell mapping_native_fn = cons(sym("native-fn"), CAST(native_fn, NATIVE_FN));
+    cell mapping_native_macro = cons(sym("native-macro"), CAST(native_macro, NATIVE_FN));
     cell new_env = cons(mapping_this_lib, env);
-    new_env = cons(mapping_native_function, new_env);
+    new_env = cons(mapping_native_fn, cons(mapping_native_macro, new_env));
     logical_line ll;
     reset_logical_line(&ll);
 
@@ -160,10 +177,3 @@ cell import(cell args, cell env) {
 
     return evalled;
 }
-
-cell native_function(cell args, cell env) {
-    if (!args) return NIL;
-    return (cell) PTR(car(args)) | NATIVE_FN;
-}
-
-

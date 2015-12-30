@@ -16,7 +16,7 @@
 #define CAST(c, t) ((cell)( PTR((cell)c) )| (t))
 #define SYM_STR(c) ((char*)PTR(c))
 #define S64_VAL(c) (*((int64_t*)PTR(c)))
-#define FFI_FN(c) ((int64_t(*)())PTR(c))
+#define FFI_FN_PTR(c) ((int64_t(*)())PTR(c))
 #define FN_PTR(c) ((cell(*)())PTR(c))
 #define car(c) ((cell)(((pair* )(PTR(c)))->car))
 #define cdr(c) ((cell)(((pair* )(PTR(c)))->cdr))
@@ -28,13 +28,13 @@
 #define cdddr(c) cdr(cdr(cdr(c)))
 #define LIST1(a) cons((a), NIL)
 #define LIST2(a, b) cons((a), cons((b), NIL))
-#define IS_CALLABLE(c) (TYPE(c) == LAMBDA || \
+#define IS_CALLABLE(c) (TYPE(c) == FN || \
                         TYPE(c) == MACRO || \
                         TYPE(c) == CONS || \
-                        TYPE(c) == FFI_FUNCTION || \
+                        TYPE(c) == FFI_FN || \
                         TYPE(c) == NATIVE_FN || \
-                        TYPE(c) == NATIVE_FN_TAILCALL || \
-                        TYPE(c) == NATIVE_FN_HELD_ARGS)
+                        TYPE(c) == NATIVE_FN_TCO || \
+                        TYPE(c) == NATIVE_MACRO)
 #define IS_S64(c) (TYPE(c) == S64)
 #define IS_PAIR(c) (TYPE(c) == PAIR)
 
@@ -46,13 +46,13 @@
 #define NIL (0LL << 48)
 #define PAIR ((uint64_t)1LL << 48)
 #define SYMBOL (2LL << 48)
-#define LAMBDA (3LL << 48)
-#define FFI_FUNCTION (4LL << 48)
+#define FN (3LL << 48)
+#define FFI_FN (4LL << 48)
 #define FFI_LIBRARY (5LL << 48)
 #define S64 (6LL << 48)
 #define NATIVE_FN (7LL << 48)
-#define NATIVE_FN_HELD_ARGS (8LL << 48)
-#define NATIVE_FN_TAILCALL (9LL << 48)
+#define NATIVE_MACRO (8LL << 48)
+#define NATIVE_FN_TCO (9LL << 48)
 #define MACRO (10LL << 48)
 #define CONS (11LL << 48)
 
@@ -67,7 +67,7 @@ typedef struct {
     cell args;
     cell body;
     cell env;
-} lambda_t;
+} fn_t;
 
 typedef struct {
     size_t len;
