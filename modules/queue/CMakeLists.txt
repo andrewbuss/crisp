@@ -1,0 +1,5 @@
+add_library(queue MODULE queue.c queue.crisp.o)
+set_target_properties(queue PROPERTIES SUFFIX ".crisp.so")
+add_custom_command(OUTPUT queue.crisp COMMAND ln -s ${CMAKE_CURRENT_SOURCE_DIR}/queue.crisp MAIN_DEPENDENCY queue.crisp)
+add_custom_command(OUTPUT queue.crisp.o COMMAND ld -r -b binary -o queue.crisp.o queue.crisp MAIN_DEPENDENCY queue.crisp)
+install(TARGETS queue DESTINATION lib)

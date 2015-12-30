@@ -87,6 +87,23 @@ cell apply_ffi_function(int64_t (* fn)(), cell args) {
     }
 }
 
+void* try_load(char* filename, bool* already_loaded) {
+    *already_loaded = (bool) dlopen(filename, RTLD_LAZY | RTLD_NOLOAD);
+    if (*already_loaded) {
+        DPRINTF("Already loaded %s\n", filename);
+        return NULL;
+    }
+
+    void* handle = dlopen(filename, RTLD_LAZY);
+    if (handle) {
+        DPRINTF("Loaded from %s: %p\n", filename, handle);
+        return handle;
+    }
+
+    DPRINTF("Failed to load %s\n", filename);
+    return NULL;
+}
+
 cell import(cell args, cell env) {
     if (!args || TYPE(car(args)) != SYMBOL) return NIL;
     char* lib_name = SYM_STR(car(args));
@@ -94,20 +111,18 @@ cell import(cell args, cell env) {
     char* lib_filename = NULL;
     void* handle;
     char* module_path = getenv("CRISP_MODULE_PATH");
+    bool already_loaded = false;
     if (!module_path) module_path = "./modules";
     module_path = realpath(module_path, NULL);
     asprintf(&lib_filename, "%s/%s/lib%s.crisp.so", module_path, lib_name, lib_name);
-    handle = dlopen(lib_filename, RTLD_LAZY);
-    DPRINTF("Loading from %s: %p\n", lib_filename, handle);
-    if (!handle) {
+    handle = try_load(lib_filename, &already_loaded);
+    if (!already_loaded && !handle) {
         asprintf(&lib_filename, "%s/lib%s.crisp.so", module_path, lib_name);
-        handle = dlopen(lib_filename, RTLD_LAZY);
-        DPRINTF("Loading from %s: %p\n", lib_filename, handle);
+        handle = try_load(lib_filename, &already_loaded);
     }
-    if (!handle) {
+    if (!already_loaded && !handle) {
         asprintf(&lib_filename, "lib%s.crisp.so", lib_name);
-        handle = dlopen(lib_filename, RTLD_LAZY);
-        DPRINTF("Loading from %s: %p\n", lib_filename, handle);
+        handle = try_load(lib_filename, &already_loaded);
     }
     free(lib_filename);
     free(module_path);
