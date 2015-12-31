@@ -1,2 +1,15 @@
 import std
 
+with queue (
+    lambda (f r) (
+        if f
+            (cons f r)
+            cons (reverse r))) (
+
+    (def queue.new lambda _ queue () ())
+    (def queue.snoc lambda (q x) queue (car q) (cons x cdr q))
+    (def queue.head lambda q caar q)
+    (def queue.tail lambda q queue (cadr q) (cdr q))
+    (def queue.empty lambda q not (ispair (car q)))
+)
+

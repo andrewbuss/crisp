@@ -1,13 +1,12 @@
-def assoc native-function this.assoc_fn
-def concat native-function this.concat_fn
-def asc native-function this.asc
-def sum native-function this.sum
-def product native-function this.product
-def quotient native-function this.quotient
-def modulus native-function this.modulus
-def hash native-function this.hash
-def zip native-function this.zip_fn
-def ispair native-function this.ispair
+def assoc native-fn this.assoc_fn
+def concat native-fn this.concat_fn
+def asc native-fn this.asc
+def sum native-fn this.sum
+def product native-fn this.product
+def modulus native-fn this.modulus
+def hash native-fn this.hash
+def zip native-fn this.zip_fn
+def ispair native-fn this.ispair
 
 def nil
 
@@ -41,6 +40,7 @@ def cdddar lambda x car (cdddr x)
 ; evaluate arguments and return NIL
 ; useful for functions with side-effects
 def void macro (() . body) and (eval body) nil
+def do macro (first . rest) void (eval first) (eval rest)
 
 ; some higher-order functions
 def identity lambda x x

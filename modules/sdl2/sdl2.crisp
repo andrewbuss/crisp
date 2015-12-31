@@ -1,0 +1,2 @@
+def sdl.init native-fn this.SDL_Init
+def sdl.create-window native-fn this.SDL_CreateWindow

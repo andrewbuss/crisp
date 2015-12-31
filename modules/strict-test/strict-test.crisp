@@ -1,0 +1,7 @@
+import std
+
+def assert native-macro this.assert
+
+with eq (lambda (x y) list-equal x y) (
+    def test lambda (actual expected)
+        eval assert eq actual expected)

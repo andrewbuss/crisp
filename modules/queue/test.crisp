@@ -1,0 +1,9 @@
+import queue
+import strict-test
+
+(
+    with q (queue.new ())
+    do (test '(queue.empty q) true)
+    with q (queue.snoc q 2)
+    test '(queue.empty q) nil
+)

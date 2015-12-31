@@ -128,10 +128,10 @@ Evaluation notes:
     PAIR, and returns a cell which may be of any type.
 
     Little is specified about the behavior of FFI functions - the interface
-    is not stable enough to describe yet. Roughly, an FFI_FUNCTION can be
+    is not stable enough to describe yet. Roughly, an FFI_FN can be
     applied to integer or symbol arguments. Symbol arguments are passed as
     pointers to the underlying strings, so (libc.puts foo) prints "foo\n".
-    The return value of an FFI_FUNCTION is always assumed to be an integer.
+    The return value of an FFI_FN is always assumed to be an integer.
     This means that (libc.malloc 4096) will return an integer pointer which
     can be passed to libc.gets or libc.free, for example.
 

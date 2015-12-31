@@ -1,0 +1,5 @@
+add_library(strict-test MODULE strict-test.crisp.o strict-test.c)
+set_target_properties(strict-test PROPERTIES SUFFIX ".crisp.so")
+add_custom_command(OUTPUT strict-test.crisp COMMAND ln -s ${CMAKE_CURRENT_SOURCE_DIR}/strict-test.crisp MAIN_DEPENDENCY strict-test.crisp)
+add_custom_command(OUTPUT strict-test.crisp.o COMMAND ld -r -b binary -o strict-test.crisp.o strict-test.crisp MAIN_DEPENDENCY strict-test.crisp)
+install(TARGETS strict-test DESTINATION lib)
