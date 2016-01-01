@@ -3,7 +3,19 @@ import strict-test
 
 (
     with q (queue.new ())
-    do (test '(queue.empty q) true)
+    do (test (queue.empty q) true)
     with q (queue.snoc q 2)
-    test '(queue.empty q) nil
+    do (test (queue.empty q) nil)
+    do (test (queue.head q) 2)
+    with q (queue.snoc q 3)
+    with q (queue.snoc q 4)
+    with q (queue.snoc q 5)
+    with q (queue.tail q)
+    do (test (queue.head q) 3)
+    with q (queue.tail q)
+    do (test (queue.head q) 4)
+    with q (queue.tail q)
+    do (test (queue.head q) 5)
+    with q (queue.tail q)
+    do (test (queue.empty q) true)
 )
