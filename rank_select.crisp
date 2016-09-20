@@ -1,0 +1,151 @@
+import std
+
+defrec unfold (step stop x) (
+       if (stop x) nil
+       (cons x (unfold step stop (step x))))
+
+test '(unfold inc (lambda x asc 5 x) 1) '(1 2 3 4 5)
+
+def double lambda x sum x x
+
+test '(double 42) 84
+
+def desc-powers-of-two reverse (unfold double (lambda x asc 65536 x) 1)
+
+defrec find (f l) if l (
+       with h (car l)   
+       if (f h) h
+       find f (cdr l))
+
+test '(find (lambda x equal 24 (double x)) (4 12 45)) 12
+
+def find-first-lt lambda (x l) find (lambda v asc v x) l
+
+test '(find-first-lt 1234 desc-powers-of-two) 1024
+test '(find-first-lt 1025 desc-powers-of-two) 1024
+test '(find-first-lt 1024 desc-powers-of-two) 512
+
+def report-fails lambda ts (
+    with fails (filter (lambda t (equal (car t) fail:)) ts)
+    with count-fails (len fails)
+    if (asc 0 count-fails) (count-fails testfails))
+
+(
+    with split-at-fn (rec split-at (l r i)
+        if (not r) (cons l)
+        if (equal i 0) (l . r)
+        with h (car r)
+        with t (cdr r)
+        split-at (cons h l) t (dec i))
+
+    def split-at lambda (l i) (
+        with result (split-at-fn () l i)
+        cons (reverse (car result)) cdr result)
+)
+				
+test '(split-at (1 2 3 4) 3) '((1 2 3) 4)
+test '(split-at (1 2 3 4) 0) '(() . (1 2 3 4))
+test '(split-at (1 2 3 4) 4) '((1 2 3 4) . ())
+
+(
+    with bitvec-rank (lambda (bv x) apply sum (car (split-at bv x)))
+    with bitvec-select-fn (rec bitwise-select-fn (a b)
+       with idx (car a)
+       with seeking (cdar a)
+
+       ; we've already found it; just pass it through
+       if (asc seeking 0) a
+
+       ; this is a zero; increment idx and continue
+       if (equal b 0) ((inc idx) seeking)
+       with seeking (dec seeking)
+       
+       ; this is a one; did we just find the nth one?
+       if (asc seeking 0) (idx seeking)
+       ((inc idx) seeking))
+    
+    ; wrapper to extract the result
+    with bitvec-select (lambda (l n)
+    	with result (foldl bitvec-select-fn (0 n) l)
+        if (asc (cdar result) 0) (car result))
+
+    with chunk-size 4
+
+    with make-leaf-node (lambda bv 
+    	cons (papply bitvec-rank bv)
+        cons (papply bitvec-select bv))
+
+    with succinct-rank (lambda (s i) ((car s) i))
+    with succinct-select (lambda (s i) ((cdar s) i))
+
+    with make-node (rec make-node bv if bv (
+           with bvlen (len bv)
+
+	   ; if we're going to construct 
+	   if (asc bvlen (inc chunk-size)) (make-leaf-node bv)
+	   with left-size (find-first-lt bvlen desc-powers-of-two)
+           with split-bv (split-at bv left-size)
+	   with left-bv (car split-bv)
+	   with right-bv (cdr split-bv)
+	   with total-ones (apply sum bv)
+	   with left-ones (apply sum left-bv)
+	   with left-node (make-node left-bv)
+	   with right-node (make-node right-bv)
+	   with rank-fn (lambda x
+ 	   	if (asc x left-size)
+		   (succinct-rank left-node x)
+		   (sum left-ones (succinct-rank
+		                   right-node (sub x left-size))))
+           with select-fn (lambda x
+	   	if (asc (dec total-ones) x) ()
+	   	if (asc x left-ones)
+		    (succinct-select left-node x)
+		    (sum left-size (succinct-select 
+			 	    right-node (sub x left-ones))))
+			
+           cons rank-fn cons select-fn))
+
+    ; export the values we'll want externally
+    with _ (void
+	(def make-succinct make-node)
+ 	(def bitvec-rank bitvec-rank)
+ 	(def bitvec-select bitvec-select)
+    	(def succinct-rank succinct-rank)
+ 	(def succinct-select succinct-select))
+
+    with test-bv (1 0 1 1 0 1 0 0 1)
+    
+    report-fails (
+        (testwith bitvec-rank (test-bv 0) 0)
+        (testwith bitvec-rank (test-bv 1) 1)
+        (testwith bitvec-rank (test-bv 2) 1)
+        (testwith bitvec-rank (test-bv 3) 2)
+        (testwith bitvec-rank (test-bv 9) 5)
+
+        (testwith bitvec-select (test-bv 0) 0)
+        (testwith bitvec-select (test-bv 1) 2)
+        (testwith bitvec-select (test-bv 2) 3)
+        (testwith bitvec-select (test-bv 4) 8))
+
+)
+
+(
+    with test-bv (0 1 0 1 1 0 0 1 0 1 0 0 0 0 1)
+    with s (make-succinct test-bv)
+
+    ; compare our tree's results with the results
+    ; from the straightforward approach
+    
+    with select-results (map (papply succinct-select s)
+    	 (range (len test-bv)))
+    with rank-results (map (papply succinct-rank s)
+    	 (range (len test-bv)))
+    with select-reference (map (papply bitvec-select test-bv)
+    	 (range (len test-bv)))
+    with rank-reference (map (papply bitvec-rank test-bv)
+    	 (range (len test-bv)))
+    report-fails (
+         (test select-results select-reference)
+	 (test rank-results rank-reference))
+)
+
