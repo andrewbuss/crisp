@@ -51,7 +51,8 @@ int main(int argc, char** argv) {
     size_t len = 0;
 
 #ifdef FUZZ
-    for(int i = 0; i<5; i++){
+    int i;
+    for(i = 0; i<5; i++){
         if (-1 == getline(&line, &len, stdin))
             return 0;
         if(strlen(line) > 50) return 0;

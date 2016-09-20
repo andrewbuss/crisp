@@ -7,9 +7,9 @@ script:
   - ln -s ../libatomic_ops bdwgc/libatomic_ops
   - cmake . -DCMAKE_BUILD_TYPE=Release
   - make
+  - make crisp_fuzz
   - ./crisp < tests.crisp | tee test.log
   - (! grep -v pass test.log)
   - ./crisp < libc_demo.crisp
   - ./crisp < rank_select.crisp
-  - make crisp_fuzz
   - ./crisp < benchmark.crisp
