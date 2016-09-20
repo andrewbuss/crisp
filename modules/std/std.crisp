@@ -226,3 +226,30 @@ defrec reversed-range (end) (
 ; return 0 to end, right-exclusive
 def range lambda end reverse (reversed-range (dec end))
 
+defrec unfold (step stop x) (
+       if (stop x) nil
+       (cons x (unfold step stop (step x))))
+
+defrec find (f l) if l (
+       with h (car l)   
+       if (f h) h
+       find f (cdr l))
+
+def report-fails lambda ts (
+    with fails (filter (lambda t (equal (car t) fail:)) ts)
+    with count-fails (len fails)
+    if (asc 0 count-fails) (count-fails testfails))
+
+
+(
+    with split-at-fn (rec split-at (l r i)
+        if (not r) (cons l)
+        if (equal i 0) (l . r)
+        with h (car r)
+        with t (cdr r)
+        split-at (cons h l) t (dec i))
+
+    def split-at lambda (l i) (
+        with result (split-at-fn () l i)
+        cons (reverse (car result)) cdr result)
+)

@@ -212,6 +212,22 @@ test '(sum 5 5) 10
 test '(with x y) ()
 test '(with 0 . 300000000000000) ()
 
+test '(unfold inc (lambda x asc 5 x) 1) '(1 2 3 4 5)
+
+def desc-powers-of-two reverse (unfold double (lambda x asc 65536 x) 1)
+
+test '(find (lambda x equal 24 (double x)) (4 12 45)) 12
+
+def find-first-lt lambda (x l) find (lambda v asc v x) l
+
+test '(find-first-lt 1234 desc-powers-of-two) 1024
+test '(find-first-lt 1025 desc-powers-of-two) 1024
+test '(find-first-lt 1024 desc-powers-of-two) 512
+				
+test '(split-at (1 2 3 4) 3) '((1 2 3) 4)
+test '(split-at (1 2 3 4) 0) '(() . (1 2 3 4))
+test '(split-at (1 2 3 4) 4) '((1 2 3 4) . ())
+
 (
     with libc (dlopen libc.so.6)
     with glib (dlopen libglib-2.0.so)
