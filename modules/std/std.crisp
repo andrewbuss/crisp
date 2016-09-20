@@ -3,6 +3,7 @@ def concat native-function this.concat_fn
 def asc native-function this.asc
 def sum native-function this.sum
 def product native-function this.product
+def quotient native-function this.quotient
 def modulus native-function this.modulus
 def hash native-function this.hash
 def zip native-function this.zip_fn

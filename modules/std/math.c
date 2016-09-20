@@ -18,6 +18,17 @@ cell product(cell args, cell env) {
     return make_s64(S64_VAL(car(args)) * S64_VAL(product(cdr(args), NIL)));
 }
 
+cell quotient(cell args, cell env) {
+  // quotient 7 4 -> 1
+  // quotient 7 2 -> 3
+  if (!args || !IS_PAIR(cdr(args))) return NIL;
+  cell a = car(args);
+  cell b = cdar(args);
+  if (!IS_S64(a) || !IS_S64(b)) return NIL;
+  if (S64_VAL(b) == 0) return NIL;
+  return make_s64(S64_VAL(a) / S64_VAL(b));
+}
+
 cell modulus(cell args, cell env) {
     // modulus 7 3 -> 1
     // modulus 7 0 ->
