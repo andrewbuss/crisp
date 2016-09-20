@@ -14,7 +14,7 @@ add_subdirectory(modules/map)
 add_subdirectory(modules/std)
 add_subdirectory(modules/queue)
 add_subdirectory(modules/strict-test)
-add_subdirectory(modules/sdl2)
+# add_subdirectory(modules/sdl2)
 
 add_executable(crisp_fuzz EXCLUDE_FROM_ALL crisp.c interpreter.c parse.c)
 set_property(TARGET crisp_fuzz APPEND PROPERTY COMPILE_DEFINITIONS DISABLE_FFI=1)

@@ -140,7 +140,9 @@ cell import(cell args, cell env) {
     free(module_path);
     if (!handle) return NIL;
 
-    for (char* i = lib_name; *i; i++) {
+    char* i;
+
+    for (i = lib_name; *i; i++) {
         if (*i == '-') *i = '_';
     }
 
