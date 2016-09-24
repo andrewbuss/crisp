@@ -147,7 +147,7 @@ def rec macro (f-name f-args . f-def) (
     ; uncurry ourselves so we can call this normally
     uncurrier (makerec f-curried))
 
-; at last we have a means of recursion for functions of arbitrary arity
+; at last we have a means of recursion for functions of arbitrary
 def defrec macro (f-name f-args . f-def) eval def f-name rec f-name f-args f-def
 
 void (

@@ -1,12 +1,26 @@
 import std
+import 'map
+import strict-test
 
 ; This function times evaluation of a piece of code using libc's clock() function
 with libc (dlopen libc.so.6) void (
-    def benchmark lambda code
-        with start-time (libc.clock ())
-        with result     (eval code)
-        with end-time   (libc.clock ())
-        (void libc.printf %9dus (sub end-time start-time)) code)
+    do (def benchmark lambda code
+            with start-time (libc.clock ())
+            with result     (eval code)
+            with end-time   (libc.clock ())
+            all (
+                (libc.printf %9dus (sub end-time start-time))
+                (libc.putchar 32)
+                (code . result)))
+    do (def random-list lambda n map libc.rand (range n))
+    do (def random-assoc-list lambda n apply zip (map random-list (n n))))
+
+benchmark '(def testlist (random-assoc-list 3000))
+benchmark '(def testmap (mkmap testlist))
+
+; check whether each element in the assoc list matches the result of lookup in the map
+def map-verify-elem lambda p equal (cdr (assoc (car p) testmap)) (cdr p)
+benchmark '(assert (all (map map-verify-elem testlist)))
 
 ; The simplest case of recursion: recurse-global is defined globally
 ; so no combinator tricks are required to call this function inside itself
@@ -92,3 +106,4 @@ def tak lambda (x y z k) (
                                 tak v1 v2 v3 k))))
 
 benchmark '(tak 24 16 8 identity)
+

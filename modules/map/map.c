@@ -57,7 +57,8 @@ cell map_lookup(cell args, cell env) {
 }
 
 void print_tree(cell tree, int level) {
-    for(int i = level; i > 0; i--){
+    int i;
+    for(i = level; i > 0; i--){
         DPRINTF(" ", i);
     }
     if(!tree) {
