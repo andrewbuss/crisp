@@ -127,12 +127,6 @@ cell register_type(cell args, cell env) {
     return make_s64((int64_t) *typecode);
 }
 
-cell typeof_fn(cell args, cell env) {
-    if(!args) return NIL;
-    DPRINTF("target has type %llu\n", TYPE(car(args)));
-    return make_s64(TYPE(car(args)) >> 48);
-}
-
 cell import(cell args, cell env) {
     if (!args || TYPE(car(args)) != SYMBOL) return NIL;
     char* lib_name = SYM_STR(car(args));

@@ -16,6 +16,11 @@ void* malloc_or_die(size_t size) {
     return rv;
 }
 
+cell typeof_fn(cell args, cell env) {
+    if(!args) return NIL;
+    return make_s64(TYPE(car(args)) >> 48);
+}
+
 cell make_s64(int64_t x) {
     cell rv = (cell) malloc_or_die(8);
     *(int64_t*) rv = x;
@@ -69,6 +74,14 @@ cell sym(char* symbol) {
     return car(sym_list);
 }
 
+cell equal(cell left, cell right) {
+    if (left == right) {
+        return left;
+    }
+    if (IS_S64(left) && IS_S64(right) && S64_VAL(left) == S64_VAL(right))
+        return left;
+    return NIL;
+}
 
 // Builtin functions
 
@@ -120,15 +133,6 @@ cell same(cell args, cell env) {
     cell first = car(args);
     cell rest = cdr(args);
     if (!rest || (IS_PAIR(rest) && (first == same(rest, NIL)))) return first;
-    return NIL;
-}
-
-static inline cell equal(cell left, cell right) {
-    if (left == right) {
-        return left;
-    }
-    if (IS_S64(left) && IS_S64(right) && S64_VAL(left) == S64_VAL(right))
-        return left;
     return NIL;
 }
 
