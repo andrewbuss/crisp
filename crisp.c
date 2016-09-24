@@ -452,7 +452,7 @@ cell eval(cell c, cell env) {
         }
         else {
             // Slide sideways into a new execution context
-            DPRINTF("\x1b[34m" "Slide sideways... \n" "\x1b[0m", NULL);
+            DPRINTF("\x1b[34m" "TC slide\n" "\x1b[0m", NULL);
         }
 
         continue;

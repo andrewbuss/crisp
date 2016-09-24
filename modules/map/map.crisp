@@ -1,9 +1,11 @@
+import std
+
 register-type this.MAP
 def mkmap native-fn this.mkmap
 
 ; Override the existing assoc implementation by adding a handler for MAP type
 def assoc (
-    with MAP (typeof (mkmap (1 2 3)))
+    with MAP (typeof (mkmap ((x . x) (x . x))))
     with old-assoc assoc
     with map_lookup (native-fn this.map_lookup)
     lambda (key dict)

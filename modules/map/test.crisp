@@ -5,16 +5,25 @@ import strict-test
 ; so we need to import using a quote here..
 import 'map
 
-(
+void (
     ; assoc should work as before
     do (test (assoc 4 ((1 . 2) (3 . 4))) nil)
     do (test (assoc 4 ((1 . 2) (4 . 3))) (4 . 3))
+    do (test (assoc 4 ((1 . 2) (4 . 3) (4 . 7))) (4 . 3))
 
     ; overload assoc with
-    with m (mkmap ((1 . 2) (3 . 4) (blah . 4) (y . nil) (spam . foo)))
+    with m (mkmap ((1 . 2) (3 . 4) (blah . 4) (y . nil) (spam . foo) (blah . 7)))
     do (test (assoc 1 m) (1 . 2))
     do (test (assoc spam m) (spam . foo))
     do (test (assoc x m) nil)
     do (test (assoc y m) (y . nil))
+
+    ; unlike normal assoc behavior, later assoc list elements hide earlier ones
+    do (test (assoc blah m) (blah . 7))
+
+    ; if maintaining assoc semantics is important, reverse before passing to mkmap
+    with m (mkmap (reverse ((a . b) (2 . 6) (a . c))))
+    do (test (assoc a m) (a . b))
+    do (test (assoc 2 m) (2 . 6))
 )
 
