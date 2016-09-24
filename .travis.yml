@@ -10,6 +10,8 @@ script:
   - make crisp_fuzz
   - ./crisp < tests.crisp | tee test.log
   - (! grep -v pass test.log)
+  - ./crisp < modules/queue/test.crisp
+  - ./crisp < modules/map/test.crisp
   - ./crisp < libc_demo.crisp
   - ./crisp < rank_select.crisp
   - ./crisp < benchmark.crisp

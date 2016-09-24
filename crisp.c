@@ -177,6 +177,8 @@ cell zip(cell a, cell b) {
 }
 
 // assoc yields the pair in dict whose car is equal to key
+// We need to distinguish between the cases where dict[key]
+// is nil and when key is not in dict
 cell assoc(cell key, cell dict) {
     if (!IS_PAIR(dict) || !IS_PAIR(car(dict))) return NIL;
     if (equal(key, caar(dict))) return car(dict);
@@ -231,7 +233,7 @@ bool apply(cell fn, cell* args, cell* env) {
             TC_RETURN(apply_ffi_function(FFI_FN_PTR(fn), *args));
 #endif
         default:
-            puts("Tried to evaluate something uncallable");
+            puts("Tried to apply something uncallable");
             exit(-1);
             *args = NIL;
             return false;
@@ -380,6 +382,7 @@ cell eval(cell c, cell env) {
                 goto eval_slide;
             }
 
+            if (TYPE(first) == FFI_SYM) first = CAST(first, FFI_FN);
             // sum x y -> sum (eval x) (eval y) -> apply sum (1 2) -> 3
             if (IS_CALLABLE(first)) {
                 cell fn = first;
@@ -420,9 +423,9 @@ cell eval(cell c, cell env) {
             }
 
 #ifndef DISABLE_FFI
-            cell ffi_fn = find_ffi_function(SYM_STR(c), env);
-            if (ffi_fn) {
-                new_cons = ffi_fn;
+            cell ffi_sym = find_ffi_sym(SYM_STR(c), env);
+            if (ffi_sym) {
+                new_cons = ffi_sym;
                 goto eval_return;
             }
 #endif

@@ -3,15 +3,18 @@
 #include <gc.h>
 #include <dlfcn.h>
 #include <stdio.h>
-#include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
+typedef unsigned long long int uintptr_t;
+typedef unsigned long long int uint64_t;
+typedef uintptr_t cell;
+
 // The top 16 bits of the 64 bit address space are unused
 // Type information is stored there instead
-#define TYPE(x) (((uint64_t)x) & 0xffff000000000000)
+#define TYPE(x) (((unsigned long long int)x) & 0xffff000000000000)
 #define PTR(x) ((void*)((x) & 0xffffffffffff))
 #define CAST(c, t) ((cell)( PTR((cell)c) )| (t))
 #define SYM_STR(c) ((char*)PTR(c))
@@ -35,6 +38,7 @@
                         TYPE(c) == NATIVE_FN || \
                         TYPE(c) == NATIVE_FN_TCO || \
                         TYPE(c) == NATIVE_MACRO)
+
 #define IS_S64(c) (TYPE(c) == S64)
 #define IS_PAIR(c) (TYPE(c) == PAIR)
 
@@ -43,20 +47,20 @@
 #define TC_RETURN(val) do {*args = val; return false;} while(0)
 #define TC_SLIDE(val) do {*args = val; return true;} while(0)
 
-#define NIL (0LL << 48)
-#define PAIR ((uint64_t)1LL << 48)
-#define SYMBOL (2LL << 48)
-#define FN (3LL << 48)
-#define FFI_FN (4LL << 48)
-#define FFI_LIBRARY (5LL << 48)
-#define S64 (6LL << 48)
-#define NATIVE_FN (7LL << 48)
-#define NATIVE_MACRO (8LL << 48)
-#define NATIVE_FN_TCO (9LL << 48)
-#define MACRO (10LL << 48)
-#define CONS (11LL << 48)
-
-typedef uintptr_t cell;
+#define NIL           (0LL << 48)
+#define PAIR          (1LL << 48)
+#define SYMBOL        (2LL << 48)
+#define FN            (3LL << 48)
+#define FFI_SYM       (4LL << 48)
+#define FFI_LIBRARY   (5LL << 48)
+#define FFI_FN        (6LL << 48)
+#define S64           (7LL << 48)
+#define NATIVE_FN     (8LL << 48)
+#define NATIVE_MACRO  (9LL << 48)
+#define NATIVE_FN_TCO (10LL << 48)
+#define MACRO         (11LL << 48)
+#define CONS          (12LL << 48)
+#define BUILTIN_TYPE_COUNT ((CONS >> 48) + 1)
 
 typedef struct {
     cell car;
@@ -100,13 +104,13 @@ cell dlsym_fn(cell args, cell env);
 cell equal_fn(cell args, cell env);
 cell eval(cell c, cell env);
 cell evalmap(cell args, cell env);
-cell find_ffi_function(char* sym_name, cell env);
+cell find_ffi_sym(char* sym_name, cell env);
 bool if_fn(cell* args, cell* env);
 cell import(cell args, cell env);
 cell lambda(cell args, cell env);
 cell macro(cell args, cell env);
 cell make_s64(int64_t x);
-cell native_function(cell args, cell env);
+cell typeof_fn(cell args, cell env);
 cell parse(char** s);
 cell quote(cell args, cell env);
 cell same(cell args, cell env);

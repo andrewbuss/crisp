@@ -110,6 +110,8 @@ static int print(cell c) {
         case NATIVE_FN_TCO:
         case NATIVE_MACRO:
             return catf("NATIVE_FUNCTION<%p>", PTR(c));
+        case FFI_SYM:
+            return catf("FFI_SYM<%p>", PTR(c));
         case FFI_FN:
             return catf("FFI_FN<%p>", PTR(c));
         case FFI_LIBRARY:

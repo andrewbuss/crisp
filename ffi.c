@@ -5,7 +5,7 @@
 
 // Try to resolve a symbol from a string of the form libname.symname
 // libname must be defined in env
-cell find_ffi_function(char* sym_name, cell env) {
+cell find_ffi_sym(char* sym_name, cell env) {
     char* dot = sym_name;
     char* cur = sym_name;
 
@@ -32,16 +32,16 @@ cell find_ffi_function(char* sym_name, cell env) {
 }
 
 // Try to resolve a symbol in a specific shared library
-// dlsym (dlopen libc.so.6) puts -> FFI_FN<...>
+// dlsym (dlopen libc.so.6) puts -> FFI_SYM<...>
 cell dlsym_fn(cell args, cell env) {
     if (!args || TYPE(car(args)) != FFI_LIBRARY || !IS_PAIR(cdr(args)))
         return NIL;
     if (!IS_PAIR(cdr(args)) || TYPE(cdar(args)) != SYMBOL)
         return NIL;
-    void* sym = dlsym((void*) PTR(car(args)), SYM_STR(cdar(args)));
+    void* sym = dlsym(PTR(car(args)), SYM_STR(cdar(args)));
 
     if (!sym) return NIL;
-    return (cell) sym | FFI_FN;
+    return (cell) sym | FFI_SYM;
 }
 
 // Open a shared library by name
@@ -65,7 +65,7 @@ cell apply_ffi_function(int64_t (* fn)(), cell args) {
             ffi_args[i] = SYM_STR(arg);
         else if (TYPE(arg) == S64)
             ffi_args[i] = (void*) S64_VAL(arg);
-        else if (TYPE(arg) == FFI_FN)
+        else if (TYPE(arg) == FFI_SYM || TYPE(arg) == FFI_FN)
             ffi_args[i] = (void*) PTR(arg);
         else
             ffi_args[i] = NULL;
@@ -117,6 +117,22 @@ cell native_macro(cell args, cell env) {
     return CAST(car(args), NATIVE_MACRO);
 }
 
+cell register_type(cell args, cell env) {
+    static short type_count = BUILTIN_TYPE_COUNT;
+    if(!args || TYPE(car(args)) != FFI_SYM) return NIL;
+    uint64_t* typecode = PTR(car(args));
+    if(!typecode) return NIL;
+    DPRINTF("Assigning typecode %d\n", type_count);
+    *typecode = (uint64_t) type_count++ << 48;
+    return make_s64((int64_t) *typecode);
+}
+
+cell typeof_fn(cell args, cell env) {
+    if(!args) return NIL;
+    DPRINTF("target has type %llu\n", TYPE(car(args)));
+    return make_s64(TYPE(car(args)) >> 48);
+}
+
 cell import(cell args, cell env) {
     if (!args || TYPE(car(args)) != SYMBOL) return NIL;
     char* lib_name = SYM_STR(car(args));
@@ -161,7 +177,9 @@ cell import(cell args, cell env) {
     cell mapping_native_fn = cons(sym("native-fn"), CAST(native_fn, NATIVE_FN));
     cell mapping_native_macro = cons(sym("native-macro"), CAST(native_macro, NATIVE_FN));
     cell new_env = cons(mapping_this_lib, env);
+    new_env = cons(cons(sym("register-type"), CAST(register_type, NATIVE_FN)), new_env);
     new_env = cons(mapping_native_fn, cons(mapping_native_macro, new_env));
+
     logical_line ll;
     reset_logical_line(&ll);
 

@@ -10,7 +10,6 @@ int main(int argc, char** argv) {
 
     stack_base = &argc;
 
-
     global_env = cons(cons(sym("eval"), CAST(eval, NATIVE_FN)), global_env);
     global_env = cons(cons(sym("quote"), CAST(quote, NATIVE_MACRO)), global_env);
     global_env = cons(cons(sym("lambda"), CAST(lambda, NATIVE_MACRO)), global_env);
@@ -21,12 +20,14 @@ int main(int argc, char** argv) {
     global_env = cons(cons(sym("same"), CAST(same, NATIVE_FN)), global_env);
     global_env = cons(cons(sym("def"), CAST(def, NATIVE_MACRO)), global_env);
     global_env = cons(cons(sym("macro"), CAST(macro, NATIVE_MACRO)), global_env);
+    global_env = cons(cons(sym("typeof"), CAST(typeof_fn, NATIVE_FN)), global_env);
 
 #ifndef DISABLE_FFI
     global_env = cons(cons(sym("dlopen"), CAST(dlopen_fn, NATIVE_FN)), global_env);
     global_env = cons(cons(sym("dlsym"), CAST(dlsym_fn, NATIVE_FN)), global_env);
     global_env = cons(cons(sym("import"), CAST(import, NATIVE_FN)), global_env);
 #endif
+
     global_env = cons(cons(sym("apply"), CAST(apply_fn, NATIVE_FN_TCO)), global_env);
     global_env = cons(cons(sym("if"), CAST(if_fn, NATIVE_FN_TCO)), global_env);
     global_env = cons(cons(sym("with"), CAST(with, NATIVE_FN_TCO)), global_env);

@@ -5,7 +5,6 @@ with queue (
         if f
             (cons f r)
             cons (reverse r))) void (
-
     (def queue.new lambda _ queue () ())
     (def queue.snoc lambda (q x) queue (car q) (cons x cdr q))
     (def queue.head lambda q caar q)
