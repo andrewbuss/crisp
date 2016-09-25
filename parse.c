@@ -56,7 +56,7 @@ cell parse(char** s) {
             // Try to turn the token into a number
             char* endptr;
             long val = strtol(token, &endptr, 0);
-            if (endptr != token) c = make_s64(val);
+            if (endptr != token) c = make_int(val);
             else c = sym(token);
             free(token);
             return cons(c, parse(s));
@@ -103,7 +103,8 @@ static int print(cell c) {
                 catf(". ");
             return print(cdr(c));
         case S64:
-            return catf("%ld", S64_VAL(c));
+        case S32:
+            return catf("%ld", INT_VAL(c));
         case SYMBOL:
             return catf("%s", SYM_STR(c));
         case NATIVE_FN:

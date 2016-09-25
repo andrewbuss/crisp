@@ -18,7 +18,7 @@ typedef uintptr_t cell;
 #define PTR(x) ((void*)((x) & 0xffffffffffff))
 #define CAST(c, t) ((cell)( PTR((cell)c) )| (t))
 #define SYM_STR(c) ((char*)PTR(c))
-#define S64_VAL(c) (*((int64_t*)PTR(c)))
+#define INT_VAL(c) (TYPE(c) == S64 ? (*((int64_t*)PTR(c))) : (int64_t)(int32_t)PTR(c))
 #define FFI_FN_PTR(c) ((int64_t(*)())PTR(c))
 #define FN_PTR(c) ((cell(*)())PTR(c))
 #define car(c) ((cell)(((pair* )(PTR(c)))->car))
@@ -39,7 +39,7 @@ typedef uintptr_t cell;
                         TYPE(c) == NATIVE_FN_TCO || \
                         TYPE(c) == NATIVE_MACRO)
 
-#define IS_S64(c) (TYPE(c) == S64)
+#define IS_INT(c) (TYPE(c) == S64 || TYPE(c) == S32)
 #define IS_PAIR(c) (TYPE(c) == PAIR)
 
 #define DPRINTF(fmt, ...) do { if (debug) fprintf(stderr, fmt, __VA_ARGS__); } while (0)
@@ -55,11 +55,12 @@ typedef uintptr_t cell;
 #define FFI_LIBRARY   (5LL << 48)
 #define FFI_FN        (6LL << 48)
 #define S64           (7LL << 48)
-#define NATIVE_FN     (8LL << 48)
-#define NATIVE_MACRO  (9LL << 48)
-#define NATIVE_FN_TCO (10LL << 48)
-#define MACRO         (11LL << 48)
-#define CONS          (12LL << 48)
+#define S32           (8LL << 48)
+#define NATIVE_FN     (9LL << 48)
+#define NATIVE_MACRO  (10LL << 48)
+#define NATIVE_FN_TCO (11LL << 48)
+#define MACRO         (12LL << 48)
+#define CONS          (13LL << 48)
 #define BUILTIN_TYPE_COUNT ((CONS >> 48) + 1)
 
 typedef struct {
@@ -109,7 +110,7 @@ bool if_fn(cell* args, cell* env);
 cell import(cell args, cell env);
 cell lambda(cell args, cell env);
 cell macro(cell args, cell env);
-cell make_s64(int64_t x);
+cell make_int(int64_t x);
 cell typeof_fn(cell args, cell env);
 cell parse(char** s);
 cell quote(cell args, cell env);

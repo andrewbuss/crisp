@@ -18,8 +18,8 @@ unsigned int hash64(uint64_t a){
 }
 
 unsigned int get_key_hash(cell k) {
-    uint64_t k_val;
-    if(TYPE(k) == S64) k_val = S64_VAL(k);
+    uint64_t k_val = k;
+    if(IS_INT(k)) k_val = INT_VAL(k);
     else if(TYPE(k) == SYMBOL) k_val = SYM_STR(k);
     return hash64(k_val);
 }
@@ -27,8 +27,8 @@ unsigned int get_key_hash(cell k) {
 // Each node is shaped like:
 // (keyhash, left, right, val1, val2, ...)
 cell tree_insert(cell root, unsigned int keyhash, cell kvp) {
-    if(!root) return cons(make_s64(keyhash), cons(NIL, cons(NIL, LIST1(kvp))));
-    unsigned int node_keyhash = (unsigned int) S64_VAL(car(root));
+    if(!root) return cons(make_int(keyhash), cons(NIL, cons(NIL, LIST1(kvp))));
+    unsigned int node_keyhash = (unsigned int) INT_VAL(car(root));
     if(keyhash < node_keyhash) {
         ((pair*) PTR(cdr(root)))->car = tree_insert(cdar(root), keyhash, kvp);
     } else if(keyhash > node_keyhash) {
@@ -41,7 +41,7 @@ cell tree_insert(cell root, unsigned int keyhash, cell kvp) {
 
 cell tree_lookup(cell root, unsigned int keyhash, cell key) {
     if(!root) return NIL;
-    unsigned int node_keyhash = (unsigned int) S64_VAL(car(root));
+    unsigned int node_keyhash = (unsigned int) INT_VAL(car(root));
     if(keyhash < node_keyhash) {
         return tree_lookup(cdar(root), keyhash, key);
     } else if(keyhash > node_keyhash) {
@@ -65,7 +65,7 @@ void print_tree(cell tree, int level) {
         DPRINTF("---\n", 0);
         return;
     }
-    DPRINTF("%u %s\n", S64_VAL(car(tree)), print_cell(cdddr(tree)));
+    DPRINTF("%u %s\n", INT_VAL(car(tree)), print_cell(cdddr(tree)));
     if(!cdar(tree) && !cddar(tree)) return;
     print_tree(cdar(tree), level + 2);
     print_tree(cddar(tree), level + 2);

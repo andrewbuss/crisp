@@ -18,10 +18,13 @@ void* malloc_or_die(size_t size) {
 
 cell typeof_fn(cell args, cell env) {
     if(!args) return NIL;
-    return make_s64(TYPE(car(args)) >> 48);
+    return make_int(TYPE(car(args)) >> 48);
 }
 
-cell make_s64(int64_t x) {
+cell make_int(int64_t x) {
+    if(x <= 0x7fffffff && x >= -0x80000000) {
+        return CAST(x, S32);
+    }
     cell rv = (cell) malloc_or_die(8);
     *(int64_t*) rv = x;
     return CAST(rv, S64);
@@ -35,7 +38,8 @@ cell cons(cell car, cell cdr) {
 }
 
 cell make_fn(cell args, cell body, cell env) {
-    DPRINTF("\x1b[33m" "Making lambda %s = %s in %s\n" "\x1b[0m", print_cell(args), print_cell(body), print_env(env));
+    DPRINTF("\x1b[33m" "Making lambda %s = %s in %s\n" "\x1b[0m",
+            print_cell(args), print_cell(body), print_env(env));
     cell c = (cell) malloc_or_die(sizeof(fn_t));
     ((fn_t*) c)->args = args;
     ((fn_t*) c)->body = body;
@@ -78,7 +82,7 @@ cell equal(cell left, cell right) {
     if (left == right) {
         return left;
     }
-    if (IS_S64(left) && IS_S64(right) && S64_VAL(left) == S64_VAL(right))
+    if (IS_INT(left) && IS_INT(right) && INT_VAL(left) == INT_VAL(right))
         return left;
     return NIL;
 }
@@ -232,10 +236,8 @@ bool apply(cell fn, cell* args, cell* env) {
             // new_cons value, so that'd need to be piped in all the way
             // through apply_fn
             TC_RETURN(cons_fn(*args, NIL));
-#ifndef DISABLE_FFI
         case FFI_FN:
             TC_RETURN(apply_ffi_function(FFI_FN_PTR(fn), *args));
-#endif
         default:
             puts("Tried to apply something uncallable");
             exit(-1);
@@ -426,13 +428,11 @@ cell eval(cell c, cell env) {
                 goto eval_return;
             }
 
-#ifndef DISABLE_FFI
             cell ffi_sym = find_ffi_sym(SYM_STR(c), env);
             if (ffi_sym) {
                 new_cons = ffi_sym;
                 goto eval_return;
             }
-#endif
         }
 
         new_cons = c;

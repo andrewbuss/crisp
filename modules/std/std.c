@@ -6,7 +6,6 @@ cell assoc_fn(cell args, cell env) {
     return assoc(key, dict);
 }
 
-
 // Concatenate arguments
 cell concat_fn(cell args, cell env) {
     // concat (a b) c (d e) -> a b c d e
@@ -21,8 +20,8 @@ cell concat_fn(cell args, cell env) {
 }
 
 cell hash(cell args, cell env) {
-    if (!args) return make_s64(0);
-    if (TYPE(car(args)) != SYMBOL) return make_s64((uint64_t) car(args));
+    if (!args) return make_int(0);
+    if (TYPE(car(args)) != SYMBOL) return make_int((uint64_t) car(args));
 
     // djb2 best hash
     uint64_t hash = 5381;
@@ -30,7 +29,7 @@ cell hash(cell args, cell env) {
     while (*s)
         hash = ((hash << 5) + hash) + *(s++);
 
-    return make_s64(hash);
+    return make_int(hash);
 }
 
 cell ispair(cell args, cell env) {

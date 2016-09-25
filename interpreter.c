@@ -52,7 +52,13 @@ int main(int argc, char** argv) {
     size_t len = 0;
 
 #ifdef FUZZ
+
+    import(LIST1(sym("std")), global_env);
+    import(LIST1(sym("map")), global_env);
+    import(LIST1(sym("queue")), global_env);
+
     int i;
+
     for(i = 0; i<5; i++){
         if (-1 == getline(&line, &len, stdin))
             return 0;

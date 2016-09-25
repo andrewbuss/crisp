@@ -53,7 +53,7 @@ cell dlopen_fn(cell args, cell env) {
 }
 
 // Apply an FFI_FN to up to 5 arguments
-// Symbols are passed as strings, S64's are passed as longs
+// Symbols are passed as strings, ints are passed as longs
 cell apply_ffi_function(int64_t (* fn)(), cell args) {
     // Hardcode cases for up to 5 args
     void* ffi_args[6];
@@ -63,8 +63,8 @@ cell apply_ffi_function(int64_t (* fn)(), cell args) {
         cell arg = car(args);
         if (TYPE(arg) == SYMBOL)
             ffi_args[i] = SYM_STR(arg);
-        else if (TYPE(arg) == S64)
-            ffi_args[i] = (void*) S64_VAL(arg);
+        else if (IS_INT(arg))
+            ffi_args[i] = (void*) INT_VAL(arg);
         else if (TYPE(arg) == FFI_SYM || TYPE(arg) == FFI_FN)
             ffi_args[i] = (void*) PTR(arg);
         else
@@ -72,20 +72,20 @@ cell apply_ffi_function(int64_t (* fn)(), cell args) {
     }
     switch (i) {
         case 0:
-            return make_s64(fn());
+            return make_int(fn());
         case 1:
-            return make_s64(fn(ffi_args[0]));
+            return make_int(fn(ffi_args[0]));
         case 2:
-            return make_s64(fn(ffi_args[0], ffi_args[1]));
+            return make_int(fn(ffi_args[0], ffi_args[1]));
         case 3:
-            return make_s64(fn(ffi_args[0], ffi_args[1], ffi_args[2]));
+            return make_int(fn(ffi_args[0], ffi_args[1], ffi_args[2]));
         case 4:
-            return make_s64(fn(ffi_args[0], ffi_args[1], ffi_args[2], ffi_args[3]));
+            return make_int(fn(ffi_args[0], ffi_args[1], ffi_args[2], ffi_args[3]));
         case 5:
-            return make_s64(fn(ffi_args[0], ffi_args[1], ffi_args[2], ffi_args[3], ffi_args[4]));
+            return make_int(fn(ffi_args[0], ffi_args[1], ffi_args[2], ffi_args[3], ffi_args[4]));
         case 6:
         default:
-            return make_s64(fn(ffi_args[0], ffi_args[1], ffi_args[2], ffi_args[3], ffi_args[4], ffi_args[5]));
+            return make_int(fn(ffi_args[0], ffi_args[1], ffi_args[2], ffi_args[3], ffi_args[4], ffi_args[5]));
     }
 }
 
@@ -124,7 +124,7 @@ cell register_type(cell args, cell env) {
     if(!typecode) return NIL;
     DPRINTF("Assigning typecode %d\n", type_count);
     *typecode = (uint64_t) type_count++ << 48;
-    return make_s64((int64_t) *typecode);
+    return make_int((int64_t) *typecode);
 }
 
 cell import(cell args, cell env) {
