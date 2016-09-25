@@ -82,5 +82,6 @@ cell mkmap(cell args, cell env) {
         args = cdr(args);
     }
     print_tree(root, 0);
+    if(!root) return NIL;
     return CAST(root, MAP);
 }
