@@ -12,6 +12,7 @@ script:
   - (! grep -v pass test.log)
   - ./crisp < modules/queue/test.crisp
   - ./crisp < modules/map/test.crisp
-  - ./crisp < libc_demo.crisp
-  - ./crisp < rank_select.crisp
-  - ./crisp < benchmark.crisp
+  - ./crisp < examples/libc_demo.crisp
+  - ./crisp < examples/rank_select.crisp
+  - ./crisp < examples/binzipper.crisp
+  - ./crisp < examples/benchmark.crisp

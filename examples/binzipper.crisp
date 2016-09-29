@@ -1,0 +1,90 @@
+import std
+
+; We represent a tree branch as
+; (node-val left-child right-child)
+; and a leaf node as nil
+
+; We represent a zipper as a list of zipper elements e.g.
+; ((saved-left saved-node-val saved-subtree) (saved-right saved-node-val saved-subtree))
+; represents a left traversal followed by a right traversal
+; saved-left and saved-right are symbols rather than types
+
+defrec unzip (zipper tree key) (
+    if (not tree) zipper
+    
+    with node-val (car tree)
+    if (equal node-val key) zipper
+    
+    with left-child (cdar tree)
+    with right-child (cddr tree)
+
+    if (asc node-val key)
+       (unzip ((saved-left node-val left-child) . zipper)
+       	      right-child key)
+    if (asc key node-val)
+       (unzip ((saved-right node-val right-child) . zipper)
+              left-child key))
+
+def unzip papply unzip nil
+
+defrec rezip (zipper new-node) (
+    if (not zipper) new-node
+    with saved-side (caar zipper)
+    with saved-node (cadr zipper)
+    with rest-of-zipper (cdr zipper)
+    with saved-val (car saved-node)
+    with saved-subtree (cdar saved-node)
+    
+    if (equal saved-side saved-left) (rezip rest-of-zipper
+       (saved-val saved-subtree . new-node))
+    if (equal saved-side saved-right) (rezip rest-of-zipper
+       (saved-val new-node . saved-subtree)))
+
+def replace lambda (tree key new-node) rezip (unzip tree key) new-node
+def insert lambda (tree key) replace tree key (key nil . nil)
+def make-tree lambda l foldl insert (nil nil . nil) l
+def t make-tree (1 4 3 0 6)
+    
+; Tree looks like
+;    1
+;   / \
+;  0   4
+;     / \
+;    3   6
+
+t
+unzip t 3
+
+; Remove the children of 4
+replace t 4 (4 nil . nil)
+
+; Tree now looks like
+;    1
+;   / \
+;  0   4
+
+; Output:
+; 1 (0 ()) 4 (3 ()) 6 ()  
+; (saved-right 4 (6 ())) (saved-left 1 (0 ()))
+; 1 (0 ()) 4 ()
+
+; generate a tree from 100 random ints by sequential insertion
+
+with libc (dlopen libc.so.6) def rand libc.rand
+def t make-tree (map rand (range 100))
+
+defrec flatten n (
+    if (not n) nil
+    with val (car n)
+    with left (flatten (cdar n))
+    with right (flatten (cddr n))
+    reverse-concat (reverse left) (cons val right))
+
+defrec check-sorted l apply asc l
+
+; check that our insertions were correctly ordered
+with r (check-sorted (flatten t)) (
+     Min value is r)
+
+; Output:
+; Min value is 35005211
