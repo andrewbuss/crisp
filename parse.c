@@ -7,60 +7,104 @@
 // The mechanics of this function are strange. *s advances
 // along the string while parse constructs the corresponding
 // lists
+
+static bool in_string = false;
+
+cell read_string(char** s) {
+    char c = *(*s)++;
+    if (c == '\\') {
+        c = *(*s)++;
+        switch (c) {
+        case 'n':
+            c = '\n';
+            break;
+        case 't':
+            c = '\t';
+            break;
+        case '"':
+            c = '"';
+            break;
+        case '\\':
+            c = '\\';
+            break;
+        case '0':
+            c = '\0';
+            break;
+        }
+    } else if (c == '"') {
+        (*s)++;
+        return NIL;
+    }
+
+    cell rest = read_string(s);
+    return cons(make_int(c), rest);
+}
+
 cell parse(char** s) {
     // Skip whitespace
-    while (isspace(**s)) (*s)++;
+    while (isspace(**s))
+        (*s)++;
     if (!**s) return NIL;
     switch (**s) {
-        case ')':
-            (*s)++;
-            return NIL;
-        case '(': {
-            (*s)++;
-            cell first = parse(s);
-            return cons(first, parse(s));
-        }
-        case '\'': {
-            (*s)++;
-            cell rest = parse(s);
-            // ' -> ()
-            if (!rest) return NIL;
+    case '"': {
+        *(*s)++;
+        cell str = read_string(s);
+        return cons(str, parse(s));
+    }
+    case ')':
+        (*s)++;
+        return NIL;
+    case '(': {
+        (*s)++;
+        cell first = parse(s);
+        return cons(first, parse(s));
+    }
+    case '\'': {
+        (*s)++;
+        cell rest = parse(s);
+        // ' -> ()
+        if (!rest) return NIL;
 
-            // '.a -> ()
-            // ' -> ()
-            if (!IS_PAIR(rest)) return NIL;
+        // '.a -> ()
+        // ' -> ()
+        if (!IS_PAIR(rest)) return NIL;
 
-            // 'a -> (quote a)
-            if (!IS_PAIR(car(rest))) return cons(LIST2(sym("quote"), car(rest)), cdr(rest));
+        // 'a -> (quote a)
+        if (!IS_PAIR(car(rest)))
+            return cons(LIST2(sym("quote"), car(rest)), cdr(rest));
 
-            // '(a b c) -> (quote a b c)
-            return cons(cons(sym("quote"), rest), cdr(rest));
-        }
-        case '.': {
-            (*s)++;
-            cell rest = parse(s);
-            if (!rest) return NIL;
-            if (TYPE(rest) != PAIR) return NIL;
-            return car(rest);
-        }
-        default: {
-            char* i = *s;
-            while (*i && !isspace(*i) && *i != '(' && *i != ')') i++;
-            size_t token_len = i - *s;
+        // '(a b c) -> (quote a b c)
+        return cons(cons(sym("quote"), rest), cdr(rest));
+    }
 
-            char* token = strncpy(malloc(token_len + 1), *s, token_len);
-            token[token_len] = '\0';
-            *s = i;
-            cell c;
+    case '.': {
+        (*s)++;
+        cell rest = parse(s);
+        if (!rest) return NIL;
+        if (TYPE(rest) != PAIR) return NIL;
+        return car(rest);
+    }
+    default: {
+        char* i = *s;
+        while (*i && !isspace(*i) && *i != '(' && *i != ')')
+            i++;
+        size_t token_len = i - *s;
 
-            // Try to turn the token into a number
-            char* endptr;
-            long val = strtol(token, &endptr, 0);
-            if (endptr != token) c = make_int(val);
-            else c = sym(token);
-            free(token);
-            return cons(c, parse(s));
-        }
+        char* token = strncpy(malloc(token_len + 1), *s, token_len);
+        token[token_len] = '\0';
+        *s = i;
+        cell c;
+
+        // Try to turn the token into a number
+        char* endptr;
+        long val = strtol(token, &endptr, 0);
+        if (endptr != token)
+            c = make_int(val);
+        else
+            c = sym(token);
+        free(token);
+        return cons(c, parse(s));
+    }
     }
 }
 
@@ -89,56 +133,57 @@ inline static int catf(char* fmt, ...) {
 // during its traversal of c
 static int print(cell c) {
     switch (TYPE(c)) {
-        case PAIR:
-            if (TYPE(car(c)) == PAIR) {
-                catf("(");
-                print(car(c));
-                catf(")");
-            }
-            else print(car(c));
-            if (!cdr(c)) return 0;
+    case PAIR:
+        if (TYPE(car(c)) == PAIR) {
+            catf("(");
+            print(car(c));
+            catf(")");
+        } else
+            print(car(c));
+        if (!cdr(c)) return 0;
 
-            catf(" ");
-            if (TYPE(cdr(c)) != PAIR)
-                catf(". ");
-            return print(cdr(c));
-        case S64:
-        case S32:
-            return catf("%ld", INT_VAL(c));
-        case SYMBOL:
-            return catf("%s", SYM_STR(c));
-        case NATIVE_FN:
-        case NATIVE_FN_TCO:
-        case NATIVE_MACRO:
-            return catf("NATIVE_FUNCTION<%p>", PTR(c));
-        case FFI_SYM:
-            return catf("FFI_SYM<%p>", PTR(c));
-        case FFI_FN:
-            return catf("FFI_FN<%p>", PTR(c));
-        case FFI_LIBRARY:
-            return catf("FFI_LIBRARY<%p>", PTR(c));
-        case MACRO:
-            catf("(macro (");
-            goto print_args_body;
-        case FN:
-            catf("(lambda (");
-        print_args_body:
-            print(((fn_t*)PTR(c))->args);
-            catf(") ");
-            print(((fn_t*)PTR(c))->body);
-            return catf(")");
-        case CONS:
-            return catf("CONS");
-        case NIL:
-            return catf("()");
-        default:
-            return catf("UNKNOWN<%p>", c);
+        catf(" ");
+        if (TYPE(cdr(c)) != PAIR) catf(". ");
+        return print(cdr(c));
+    case S64:
+    case S32:
+        return catf("%ld", INT_VAL(c));
+    case SYMBOL:
+        return catf("%s", SYM_STR(c));
+    case NATIVE_FN:
+    case NATIVE_FN_TCO:
+    case NATIVE_MACRO:
+        return catf("NATIVE_FUNCTION<%p>", PTR(c));
+    case FFI_SYM:
+        return catf("FFI_SYM<%p>", PTR(c));
+    case FFI_FN:
+        return catf("FFI_FN<%p>", PTR(c));
+    case FFI_LIBRARY:
+        return catf("FFI_LIBRARY<%p>", PTR(c));
+    case MACRO:
+        catf("(macro (");
+        goto print_args_body;
+    case FN:
+        catf("(lambda (");
+    print_args_body:
+        print(((fn_t*)PTR(c))->args);
+        catf(") ");
+        print(((fn_t*)PTR(c))->body);
+        return catf(")");
+    case CONS:
+        return catf("CONS");
+    case NIL:
+        return catf("()");
+    default:
+        return catf("UNKNOWN<%p>", c);
     }
 }
 
 char* print_cell(cell c) {
-    buf = GC_MALLOC(64);
-    buf_len = 64;
+    if (!buf) {
+        buf = GC_MALLOC(64);
+        buf_len = 64;
+    }
     buf_index = 0;
     print(c);
     return buf;
@@ -146,8 +191,10 @@ char* print_cell(cell c) {
 
 // Handy for pretty-printing local variables in an env
 char* print_env(cell c) {
-    buf = GC_MALLOC(64);
-    buf_len = 64;
+    if (!buf) {
+        buf = GC_MALLOC(64);
+        buf_len = 64;
+    }
     buf_index = 0;
     catf("(");
     while (IS_PAIR(c)) {
@@ -174,26 +221,26 @@ void reset_logical_line(logical_line* line) {
 // if the logical line is complete and can be parsed
 bool logical_line_ingest(logical_line* line, char c) {
     switch (c) {
-        case '\n':
-            line->in_comment = false;
-            if (line->parens != 0) {
-                c = ' ';
-                break;
-            }
-        case '\0':
-            line->str[line->len] = '\0';
-            return true;
-        case ';':
-            line->in_comment = true;
-            return false;
-        case '(':
-            if(!line->in_comment) line->parens++;
+    case '\n':
+        line->in_comment = false;
+        if (line->parens != 0) {
+            c = ' ';
             break;
-        case ')':
-            if(!line->in_comment) line->parens--;
-            break;
-        default:
-            break;
+        }
+    case '\0':
+        line->str[line->len] = '\0';
+        return true;
+    case ';':
+        line->in_comment = true;
+        return false;
+    case '(':
+        if (!line->in_comment) line->parens++;
+        break;
+    case ')':
+        if (!line->in_comment) line->parens--;
+        break;
+    default:
+        break;
     }
     if (line->in_comment) return false;
 
